@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}SSTT Internos{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4">Servicios Técnicos Internos</h2>
+
+<form method="get">
+
+<select name="tecnico" class="form-select mb-3" onchange="this.form.submit()">
+
+<option value="">Seleccione técnico</option>
+
+{% for t in tecnicos %}
+<option value="{{ t }}" {% if tecnico_seleccionado == t %}selected{% endif %}>
+{{ t }}
+</option>
+{% endfor %}
+
+</select>
+
+</form>
+
+<div class="row mb-4">
+
+<div class="col-md-3">
+<div class="kpi-card">
+<div class="kpi-title">Total Mantenciones</div>
+<div class="kpi-value">{{ resumen.total }}</div>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="kpi-card">
+<div class="kpi-title">Preventivas</div>
+<div class="kpi-value text-success">{{ resumen.preventivos }}</div>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="kpi-card">
+<div class="kpi-title">Correctivas</div>
+<div class="kpi-value text-warning">{{ resumen.correctivos }}</div>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="kpi-card">
+<div class="kpi-title">Costo Total</div>
+<div class="kpi-value text-primary">
+$ {{ resumen.costo_total|default:0|floatformat:0|intcomma }}
+</div>
+</div>
+</div>
+
+</div>
+
+{% if servicios %}
+
+<div class="table-responsive">
+
+<table class="table table-bordered table-hover">
+
+<thead>
+
+<tr>
+<th>Número</th>
+<th>Fecha Finalización</th>
+<th>Cuenta First</th>
+<th>Nombre Cuenta</th>
+<th>Provincia-Estado</th>
+<th>Tipo Servicio</th>
+<th>Servicio</th>
+<th class="col-observaciones">Observaciones</th>
+<th>Valor Pago</th>
+<th>Incidencias</th>
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for s in servicios %}
+
+<tr>
+
+<td>{{ s.numero }}</td>
+
+<td>{{ s.fecha_finalizacion|date:"d/m/Y H:i" }}</td>
+
+<td>{{ s.cuenta_contable }}</td>
+
+<td>{{ s.cuenta }}</td>
+
+<td>{{ s.provincia_estado }}</td>
+
+<td>{{ s.tipo_servicio }}</td>
+
+<td>{{ s.servicio }}</td>
+
+<td>{{ s.observaciones }}</td>
+
+<td>$ {{ s.valor_pago_tecnico|floatformat:0|intcomma }}</td>
+
+<td>
+
+{% if s.numero_incidencias_dia > 2 %}
+<span class="badge bg-danger">{{ s.numero_incidencias_dia }}</span>
+
+{% elif s.numero_incidencias_dia == 2 %}
+<span class="badge bg-warning text-dark">{{ s.numero_incidencias_dia }}</span>
+
+{% else %}
+<span class="badge bg-success">{{ s.numero_incidencias_dia }}</span>
+{% endif %}
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+{% endif %}
+
+{% endblock %}

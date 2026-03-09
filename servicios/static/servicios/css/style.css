@@ -1,0 +1,40 @@
+/* TABLA GENERAL */
+table {
+    table-layout: fixed;
+}
+
+td {
+    vertical-align: top;
+}
+
+/* COLUMNA OBSERVACIONES */
+.col-observaciones {
+    width: 250px;
+    max-width: 250px;
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+/* Sticky filtros y KPIs */
+.sticky-top-container {
+    position: sticky;
+    top: 0;
+    z-index: 1050;
+    background: #f1f5f9;
+    padding: 15px 0;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* Tabla con scroll y cabecera fija */
+.table-scrollable {
+    max-height: 600px; /* altura máxima de la tabla visible */
+    overflow-y: auto;
+}
+
+.sticky-table-header th {
+    position: sticky;
+    top: 0;
+    background: #1e293b; /* igual que la tabla dark para cabecera */
+    color: white;
+    z-index: 10;
+}

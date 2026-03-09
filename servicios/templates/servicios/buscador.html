@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+
+{% block title %}Carga Archivos{% endblock %}
+
+{% block content %}
+
+    <h2 class="text-center">Buscar Servicios</h2>
+    <div class="container-fluid">
+        <form method="get">
+            <input 
+                class="form-control"
+                type="text"
+                name="q"   
+                placeholder="Buscar por contratista, número o cuenta contable"
+                value="{{ query|default:'' }}"
+            >
+            <br>
+            <div class="text-center">
+                <button class="btn btn-primary btn-lg" type="submit">
+                    Buscar
+                </button>
+            </div>
+        </form>
+    </div>
+
+<hr>
+
+    <table border="1" cellpadding="5">
+        <tr>
+            <th>Número</th>
+            <th>Fecha Finalización</th>
+            <th>Nombre Cuenta</th>
+            <th>Provincia - Estado</th>
+            <th>Tipo Servicio</th>
+            <th>Servicio</th>
+            <th>Observaciones</th>
+            <th>Técnico</th>
+            <th>Contratista</th>
+            <th>Valor</th>
+            <th>Cuenta Contable</th>
+            <th>Incidencias</th>
+        </tr>
+
+        {% for servicio in servicios %}
+        <tr>
+            <td>{{ servicio.numero }}</td>
+            <td>{{ servicio.fecha_finalizacion|date:"d/m/Y H:i" }}</td>
+            <td>{{ servicio.cuenta }}</td>
+            <td>{{ servicio.provincia_estado }}</td>
+            <td>{{ servicio.tipo_servicio }}</td>
+            <td>{{ servicio.servicio }}</td>
+            <td>{{ servicio.observaciones }}</td>
+            <td>{{ servicio.tecnico }}</td>
+            <td>{{ servicio.contratista }}</td>
+            <td>$ {{ servicio.valor_pago_tecnico|default:0|floatformat:0|intcomma }}</td>
+            <td>{{ servicio.cuenta_contable }}</td>
+            <td 
+            
+            {% if servicio.numero_incidencias_dia > 2 %}
+            <span class="badge bg-danger">{{ servicio.numero_incidencias_dia }}</span>
+
+            {% elif servicio.numero_incidencias_dia == 2 %}
+            <span class="badge bg-warning text-dark">{{ servicio.numero_incidencias_dia }}</span>
+
+            {% else %}
+            <span class="badge bg-success">{{ servicio.numero_incidencias_dia }}</span>
+            {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5">No hay resultados</td>
+        </tr>
+        {% endfor %}
+    </table>
+    
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Carga Archivos{% endblock %}
+
+{% block content %}
+
+<h3 class="mb-4">Carga Mensual de Servicios</h3>
+
+<form method="post" enctype="multipart/form-data">
+
+{% csrf_token %}
+
+<div class="row">
+
+<div class="col-md-6">
+
+<label class="form-label">Nombre carga</label>
+
+<input type="text"
+name="nombre_carga"
+class="form-control"
+placeholder="Ej: Servicios Enero 2026"
+required>
+
+</div>
+
+</div>
+
+<div class="row mt-3">
+
+<div class="col-md-6">
+
+<label class="form-label">Archivo Servicios</label>
+
+<input class="form-control" type="file" name="archivo1" required>
+
+</div>
+
+<div class="col-md-6">
+
+<label class="form-label">Archivo Incidencias</label>
+
+<input class="form-control" type="file" name="archivo2" required>
+
+</div>
+
+</div>
+
+<div class="mt-4">
+
+<button class="btn btn-primary">
+
+Procesar Archivos
+
+</button>
+
+</div>
+
+</form>
+
+{% if mensaje %}
+
+<div class="alert alert-success mt-4">
+
+{{ mensaje }}
+
+</div>
+
+{% endif %}
+
+{% endblock %}
