@@ -1,0 +1,40 @@
+<h2>Servicios Técnicos por Contratista</h2>
+
+{% if contratista %}
+<p><strong>Contratista:</strong> {{ contratista.nombre }}</p>
+{% endif %}
+
+<table border="1" cellspacing="0" cellpadding="5">
+<thead>
+<tr>
+<th>Número</th>
+<th>Fecha Finalización</th>
+<th>Cuenta First</th>
+<th>Nombre Cuenta</th>
+<th>Provincia - Estado</th>
+<th>Tipo Servicio</th>
+<th>Servicio</th>
+<th>Observaciones</th>
+<th>Valor Pago Técnico</th>
+<th>Incidencias</th>
+<th>Estado Pago</th>
+</tr>
+</thead>
+<tbody>
+{% for s in servicios %}
+<tr>
+<td>{{ s.numero }}</td>
+<td>{{ s.fecha_finalizacion|date:"d/m/Y H:i" }}</td>
+<td>{{ s.cuenta_contable }}</td>
+<td>{{ s.cuenta }}</td>
+<td>{{ s.provincia_estado }}</td>
+<td>{{ s.tipo_servicio }}</td>
+<td>{{ s.servicio }}</td>
+<td>{{ s.observaciones }}</td>
+<td>${{ s.valor_pago_tecnico|floatformat:0|intcomma }}</td>
+<td>{{ s.numero_incidencias_dia }}</td>
+<td>{{ s.get_estado_pago_display }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>

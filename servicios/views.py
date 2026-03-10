@@ -11,6 +11,9 @@ import re
 from .models import ServicioTecnico, CargaMensual, Contratista
 from django.views.decorators.csrf import csrf_exempt
 import json
+from django.template.loader import render_to_string
+from django.http import HttpResponse
+
 
 
 
@@ -63,13 +66,14 @@ def limpiar_nombre_tecnico(valor):
 # PAGINAS BASE
 # ==============================
 
-def inicio(request):
-    return render(request, "servicios/inicio.html")
+
 
 
 
 
 def internos(request):
+
+    cargas = CargaMensual.objects.all().order_by("-fecha_carga")
 
     tecnicos = ServicioTecnico.objects.filter(
         contratista__isnull=True
@@ -81,45 +85,59 @@ def internos(request):
     ).distinct().order_by("tecnico")
 
     tecnico_seleccionado = request.GET.get("tecnico")
+    carga_id = request.GET.get("carga")
+    tipo_servicio = request.GET.get("tipo_servicio")
 
-    servicios = None
-    resumen = None
-
-    if tecnico_seleccionado:
-
-        servicios = ServicioTecnico.objects.filter(
-        tecnico=tecnico_seleccionado,
+    # BASE QUERY
+    servicios = ServicioTecnico.objects.filter(
         contratista__isnull=True
     ).exclude(
         tecnico__iexact="Nexttech"
-    ).order_by("numero")
+    )
 
-        resumen = servicios.aggregate(
+    # FILTRO TECNICO
+    if tecnico_seleccionado:
+        servicios = servicios.filter(tecnico=tecnico_seleccionado)
 
-            total=Count("id"),
+    # FILTRO MES
+    if carga_id:
+        servicios = servicios.filter(carga_id=carga_id)
 
-            preventivos=Count(
-                "id",
-                filter=Q(tipo_servicio__icontains="PREVENTIV")
-            ),
+    # FILTRO TIPO SERVICIO
+    if tipo_servicio:
+        servicios = servicios.filter(tipo_servicio__icontains=tipo_servicio)
 
-            correctivos=Count(
-                "id",
-                filter=Q(tipo_servicio__icontains="CORRECTIV")
-            ),
+    servicios = servicios.order_by("numero")
 
-            costo_total=Coalesce(
-                Sum("valor_pago_tecnico"),
-                Value(0)
-            )
+    resumen = servicios.aggregate(
+
+        total=Count("id"),
+
+        preventivos=Count(
+            "id",
+            filter=Q(tipo_servicio__icontains="PREVENTIV")
+        ),
+
+        correctivos=Count(
+            "id",
+            filter=Q(tipo_servicio__icontains="CORRECTIV")
+        ),
+
+        costo_total=Coalesce(
+            Sum("valor_pago_tecnico"),
+            Value(0)
         )
+    )
 
     return render(request, "servicios/internos.html", {
 
         "tecnicos": tecnicos,
+        "cargas": cargas,
         "servicios": servicios,
         "resumen": resumen,
-        "tecnico_seleccionado": tecnico_seleccionado
+        "tecnico_seleccionado": tecnico_seleccionado,
+        "carga_id": carga_id,
+        "tipo_servicio": tipo_servicio
 
     })
 
@@ -226,15 +244,17 @@ def subir_excel(request):
 
                     nombre_tecnico = limpiar_nombre_tecnico(nombre_tecnico_original)
 
-                    if nombre_tecnico_original.upper().startswith("T. EXTERNO"):
+                    if nombre_tecnico_original.upper().startswith("T. EXTERNO") or nombre_tecnico_original.upper() == "NEXTTECH":
 
                         nombre_limpio = limpiar_nombre_tecnico(nombre_tecnico_original)
 
                         if nombre_limpio:
-
                             contratista_obj, created = Contratista.objects.get_or_create(
                                 nombre=nombre_limpio
                             )
+
+                # guardar valor original
+                valor_pago = row.get("Valor pago técnico")
 
                 ServicioTecnico.objects.create(
 
@@ -273,7 +293,9 @@ def subir_excel(request):
 
                     fecha_pago=convertir_fecha(row.get("Fecha de pago")),
 
-                    valor_pago_tecnico=row.get("Valor pago técnico"),
+                    # NUEVOS CAMPOS
+                    valor_pago_original=valor_pago,
+                    valor_pago_tecnico=valor_pago,
 
                     tiempo_trabajo_total=row.get("Tiempo de Trabajo Total"),
 
@@ -294,22 +316,31 @@ def subir_excel(request):
 def buscador_servicios(request):
 
     query = request.GET.get("q")
+    carga_id = request.GET.get("carga")
 
-    servicios = ServicioTecnico.objects.all().order_by("numero")
+    servicios = ServicioTecnico.objects.all().order_by("-fecha_finalizacion")
 
+    # filtro por carga
+    if carga_id:
+        servicios = servicios.filter(carga_id=carga_id)
+
+    # buscador
     if query:
-
         servicios = servicios.filter(
-
-            Q(tecnico__icontains=query) |
             Q(numero__icontains=query) |
-            Q(cuenta_contable__icontains=query)
-
+            Q(cuenta_contable__icontains=query) |
+            Q(cuenta__icontains=query) |
+            Q(tecnico__icontains=query) |
+            Q(contratista__nombre__icontains=query)
         )
+
+    cargas = CargaMensual.objects.all().order_by("-fecha_carga")
 
     return render(request, "servicios/buscador.html", {
         "servicios": servicios,
-        "query": query
+        "query": query,
+        "cargas": cargas,
+        "carga_seleccionada": carga_id
     })
 
 
@@ -317,78 +348,112 @@ def buscador_servicios(request):
 # CONTRATISTAS
 # ==============================
 
-from django.db.models import Count, Sum, Q, Value
-from django.db.models.functions import Coalesce
-from django.shortcuts import render, get_object_or_404
+
 
 def contratista(request):
 
+    cargas = CargaMensual.objects.all().order_by("-fecha_carga")
     contratistas = Contratista.objects.all()
+
+    carga_id = request.GET.get("carga")
     contratista_id = request.GET.get("contratista_id")
+    estado_pago = request.GET.get("estado_pago")
+    tipo_servicio = request.GET.get("tipo_servicio")
 
-    servicios = None
-    resumen = None
-    contratista = None
+    servicios = ServicioTecnico.objects.all()
 
+    # FILTRO MES
+    if carga_id:
+        servicios = servicios.filter(carga_id=carga_id)
+
+    # FILTRO CONTRATISTA
     if contratista_id:
+        servicios = servicios.filter(contratista_id=contratista_id)
 
-        contratista = get_object_or_404(Contratista, id=contratista_id)
+    # FILTRO ESTADO PAGO
+    if estado_pago:
+        servicios = servicios.filter(estado_pago=estado_pago)
 
-        servicios = ServicioTecnico.objects.filter(
-            contratista=contratista
-        ).order_by("numero")
+    # FILTRO TIPO SERVICIO
+    if tipo_servicio:
+        servicios = servicios.filter(tipo_servicio__icontains=tipo_servicio)
 
-        resumen = servicios.aggregate(
-            # Cantidades
-            total_mantenciones=Count("id"),
-            total_correctivas=Count(
-                "id",
-                filter=Q(tipo_servicio__icontains="correct")
-            ),
-            total_preventivas=Count(
-                "id",
-                filter=Q(tipo_servicio__icontains="prevent")
-            ),
+    servicios = servicios.order_by("numero")
 
-            # Montos totales por tipo
-            monto_correctivas=Coalesce(
-                Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="correct")),
-                Value(0)
-            ),
-            monto_preventivas=Coalesce(
-                Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="prevent")),
-                Value(0)
-            ),
+    resumen = servicios.aggregate(
 
-            # Montos por estado de pago
-            monto_aprobado=Coalesce(
-                Sum("valor_pago_tecnico", filter=Q(estado_pago="aprobado")),
-                Value(0)
-            ),
-            monto_revision=Coalesce(
-                Sum("valor_pago_tecnico", filter=Q(estado_pago="revision")),
-                Value(0)
-            ),
-            monto_rechazado=Coalesce(
-                Sum("valor_pago_tecnico", filter=Q(estado_pago="rechazado")),
-                Value(0)
-            ),
+        
+        # Cantidad de mantenciones
+        total_mantenciones=Count("id"),
 
-            # Cantidad por estado de pago
-            cantidad_aprobado=Count("id", filter=Q(estado_pago="aprobado")),
-            cantidad_revision=Count("id", filter=Q(estado_pago="revision")),
-            cantidad_rechazado=Count("id", filter=Q(estado_pago="rechazado")),
+        total_preventivas=Count(
+            "id",
+            filter=Q(tipo_servicio__icontains="PREVENTIV")
+        ),
 
-            # Total general
-            monto_total=Coalesce(Sum("valor_pago_tecnico"), Value(0)),
+        total_correctivas=Count(
+            "id",
+            filter=Q(tipo_servicio__icontains="CORRECTIV")
+        ),
+
+        # Montos por tipo de servicio
+        monto_preventivas=Coalesce(
+            Sum(
+                "valor_pago_tecnico",
+                filter=Q(tipo_servicio__icontains="PREVENTIV")
+            ),
+            Value(0)
+        ),
+
+        monto_correctivas=Coalesce(
+            Sum(
+                "valor_pago_tecnico",
+                filter=Q(tipo_servicio__icontains="CORRECTIV")
+            ),
+            Value(0)
+        ),
+
+        # Montos por estado de pago
+        monto_aprobado=Coalesce(
+            Sum(
+                "valor_pago_tecnico",
+                filter=Q(estado_pago="aprobado")
+            ),
+            Value(0)
+        ),
+
+        monto_revision=Coalesce(
+            Sum(
+                "valor_pago_tecnico",
+                filter=Q(estado_pago="revision")
+            ),
+            Value(0)
+        ),
+
+        monto_rechazado=Coalesce(
+            Sum(
+                "valor_pago_tecnico",
+                filter=Q(estado_pago="rechazado")
+            ),
+            Value(0)
+        ),
+
+        # Total general
+        monto_total=Coalesce(
+            Sum("valor_pago_tecnico"),
+            Value(0)
         )
+    )
 
     return render(request, "servicios/contratista.html", {
-        "contratistas": contratistas,
         "servicios": servicios,
-        "contratista": contratista,
         "resumen": resumen,
+        "cargas": cargas,
+        "contratistas": contratistas,
+        "estado_pago": estado_pago,
         "contratista_id": contratista_id,
+        "carga_id": carga_id,
+        "tipo_servicio": tipo_servicio,
     })
 
 # ==============================
@@ -459,30 +524,95 @@ def eliminar_carga(request, carga_id):
 
 @csrf_exempt
 def editar_monto_tecnico(request, servicio_id):
+
     if request.method == "POST":
+
         try:
+
             data = json.loads(request.body)
             nuevo_valor = float(data.get("valor_pago_tecnico", 0))
+
             servicio = ServicioTecnico.objects.get(id=servicio_id)
+
+            # GUARDAR VALOR ORIGINAL SOLO UNA VEZ
+            if servicio.valor_pago_original is None:
+                servicio.valor_pago_original = servicio.valor_pago_tecnico
+
+            # ACTUALIZAR VALOR EDITADO
             servicio.valor_pago_tecnico = nuevo_valor
             servicio.save()
 
             # recalcular resumen del contratista
             contratista = servicio.contratista
-            servicios = ServicioTecnico.objects.filter(contratista=contratista)
 
-            resumen = servicios.aggregate(
-                total_mantenciones=Count("id"),
-                total_preventivas=Count("id", filter=Q(tipo_servicio__icontains="PREVENTIV")),
-                total_correctivas=Count("id", filter=Q(tipo_servicio__icontains="CORRECTIV")),
-                monto_total=Coalesce(Sum("valor_pago_tecnico"), 0),
-                monto_aprobado=Coalesce(Sum("valor_pago_tecnico", filter=Q(estado_pago="aprobado")), 0),
-                monto_revision=Coalesce(Sum("valor_pago_tecnico", filter=Q(estado_pago="revision")), 0),
-                monto_rechazado=Coalesce(Sum("valor_pago_tecnico", filter=Q(estado_pago="rechazado")), 0),
+            servicios = ServicioTecnico.objects.filter(
+                contratista=contratista
             )
 
-            return JsonResponse({"success": True, "resumen": resumen})
+            resumen = servicios.aggregate(
+
+                total_mantenciones=Count("id"),
+
+                total_preventivas=Count(
+                    "id",
+                    filter=Q(tipo_servicio__icontains="PREVENTIV")
+                ),
+
+                total_correctivas=Count(
+                    "id",
+                    filter=Q(tipo_servicio__icontains="CORRECTIV")
+                ),
+
+                monto_total=Coalesce(
+                    Sum("valor_pago_tecnico"),
+                    0
+                ),
+
+                monto_aprobado=Coalesce(
+                    Sum(
+                        "valor_pago_tecnico",
+                        filter=Q(estado_pago="aprobado")
+                    ),
+                    0
+                ),
+
+                monto_revision=Coalesce(
+                    Sum(
+                        "valor_pago_tecnico",
+                        filter=Q(estado_pago="revision")
+                    ),
+                    0
+                ),
+
+                monto_rechazado=Coalesce(
+                    Sum(
+                        "valor_pago_tecnico",
+                        filter=Q(estado_pago="rechazado")
+                    ),
+                    0
+                ),
+            )
+
+            return JsonResponse({
+                "success": True,
+                "resumen": resumen
+            })
 
         except Exception as e:
-            return JsonResponse({"success": False, "error": str(e)})
-    return JsonResponse({"success": False, "error": "Método no permitido"})
+
+            return JsonResponse({
+                "success": False,
+                "error": str(e)
+            })
+
+    return JsonResponse({
+        "success": False,
+        "error": "Método no permitido"
+    })
+
+
+
+
+
+
+

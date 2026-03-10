@@ -1,0 +1,59 @@
+[
+{"model":"servicios.contratista","pk":1,"fields":{"nombre":"Nexttech","nombre_empresa":"Lago Ranco ingeniería y proyectos SPA.","rut":"77.473.562-3","fono":"942396747","correo":"ventas@nexttech.cl","ciudad":"Santiago","banco":"Santander","tipo_cuenta":"Cta Cte","numero_cuenta":"87361683","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":2,"fields":{"nombre":"Alexis Aguilar","nombre_empresa":"Sistemas de Seguridad y Telecomunicaciones SPA","rut":"76.712.474-0","fono":"56979911470","correo":"alexis.aguilar2012@yahoo.es","ciudad":"Viña","banco":"Estado","tipo_cuenta":"Vista","numero_cuenta":"23571711141","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":3,"fields":{"nombre":"Alex Acuña Fuentes","nombre_empresa":"Alex Acuña Fuentes","rut":"13.132.306-9","fono":"979810303","correo":"alexacunafuentes.22@gmail.com","ciudad":"Punta Arenas","banco":"Banco Estado","tipo_cuenta":"Chequera electrónica","numero_cuenta":"24073003420","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":4,"fields":{"nombre":"Antonio Araya","nombre_empresa":"José Antonio Araya Flores","rut":"13194635-k","fono":"942961073","correo":"Antonioarayatecnico@hotmail.com","ciudad":"Viña del Mar","banco":"","tipo_cuenta":"","numero_cuenta":"","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":5,"fields":{"nombre":"Jesus Alvear","nombre_empresa":"Jesus Alvear","rut":"16730697-7","fono":"56930551923","correo":"jesusalvearc@hotmail.com","ciudad":"Talca","banco":"BCI","tipo_cuenta":"Cuenta Corriente","numero_cuenta":"50049399","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":6,"fields":{"nombre":"Romer Perez","nombre_empresa":"Security & Technology Service Spa.","rut":"77.708.114-4","fono":"56956674990","correo":"ventas.stservice@gmail.com","ciudad":"Santiago","banco":"Santander","tipo_cuenta":"Corriente","numero_cuenta":"00009237353-3","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":7,"fields":{"nombre":"Jorge Hotus","nombre_empresa":"DATANUI SOPORTE Y ASESORÍA INFORMÁTICA JORGE HOTUS SALINAS E.I.R.L","rut":"77674172-8","fono":"982764420","correo":"admin@datanui.cl","ciudad":"Isla de Pascua","banco":"Santander","tipo_cuenta":"Cta Corriente","numero_cuenta":"91080940","categoria":"Factura exenta","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":8,"fields":{"nombre":"Jose Alvarez","nombre_empresa":"AC24SEGURIDAD SPA","rut":"77904008-9","fono":"56990200335","correo":"jeadalvarez@icloud.com","ciudad":"Coquimbo","banco":"Estado","tipo_cuenta":"Vista","numero_cuenta":"902-7-296520-9","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":9,"fields":{"nombre":"Julio Quezada","nombre_empresa":"JULIO CESAR QUEZADA VIDAL","rut":"12.403.244-k","fono":"56991224955","correo":"quezada.julio@gmail.com","ciudad":"Isla de Pascua","banco":"Santander","tipo_cuenta":"CTA CTE","numero_cuenta":"78345730","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":10,"fields":{"nombre":"Briss Cardenas","nombre_empresa":"Electranet SPA","rut":"76544161-7","fono":"56982674281","correo":"briss.cardenas@electranet.cl","ciudad":"Santiago","banco":"Estado","tipo_cuenta":"Cuenta Vista","numero_cuenta":"3447068828-1","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":11,"fields":{"nombre":"Carlos Navarro","nombre_empresa":"VyC servicios integrales spa","rut":"77.947.359-7","fono":"56951945479","correo":"cnavarro2610@gmail.com","ciudad":"Parral","banco":"Santander","tipo_cuenta":"Cuenta Corriente","numero_cuenta":"94440793","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":12,"fields":{"nombre":"Cristian Argel","nombre_empresa":"Servicios Integrales Carval SPA","rut":"77.507.469-8","fono":"56999652957","correo":"contacto@carvalseguridad.cl","ciudad":"Puerto Montt","banco":"Estado","tipo_cuenta":"Corriente","numero_cuenta":"82500347771","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":13,"fields":{"nombre":"Cristian Carvajal","nombre_empresa":"Home security spa","rut":"76.455.015-3","fono":"56999605621","correo":"ccarvajal_afta@yahoo.es","ciudad":"Antofagasta","banco":"Santander","tipo_cuenta":"Corriente","numero_cuenta":"72486854","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":14,"fields":{"nombre":"Danilo Barrios","nombre_empresa":"G Y M BARRIOS LIMITADA","rut":"76.020.471-4","fono":"930937952","correo":"ventas@procoseg.cl","ciudad":"Santiago","banco":"Banco de Chile","tipo_cuenta":"Cuenta Corriente","numero_cuenta":"","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":15,"fields":{"nombre":"Isaias Yañez","nombre_empresa":"Isaías Yañez Espinoza","rut":"12648909-9","fono":"322687498","correo":"Isaiasseguridadmundial@gmail.com","ciudad":"La Serena","banco":"Credichile","tipo_cuenta":"Cuenta Vista","numero_cuenta":"2214309","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":16,"fields":{"nombre":"Jorge Vilugron","nombre_empresa":"TECNOMONTT SPA","rut":"76.811.566-4","fono":"56940443600","correo":"gerencia@tecnomontt.cl","ciudad":"Puerto Montt","banco":"Credito e Inversiones","tipo_cuenta":"Cuenta Corriente","numero_cuenta":"46957855","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":17,"fields":{"nombre":"Marcel Araneda","nombre_empresa":"Servicios Marcel Araneda EIRL","rut":"76.087.784-0","fono":"5695798706","correo":"marcel.araneda.ferrada@gmail.com","ciudad":"Concepcion","banco":"Scotiabank","tipo_cuenta":"Cuenta Corriente","numero_cuenta":"979729359","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":18,"fields":{"nombre":"Marcelo Colque","nombre_empresa":"SERVICIOS ELECTRÓNICOS Y OBRAS MENORES EN CONSTRUCCIÓN MARCELO JAVIER","rut":"76.992.692-5","fono":"981953456","correo":"marcolque@gmail.com","ciudad":"Iquique","banco":"BCI NOVA","tipo_cuenta":"Cuenta Vista","numero_cuenta":"17760844","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":19,"fields":{"nombre":"Rigoberto Salazar","nombre_empresa":"NEGTEL INGENIERIA SPA","rut":"77.347.923-2","fono":"56987106983","correo":"rsm.asesorias@gmail.com","ciudad":"Arica","banco":"Santander","tipo_cuenta":"CTA CTE","numero_cuenta":"0-000-9690183-6","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":20,"fields":{"nombre":"Nelson Vera","nombre_empresa":"Instalaciones Eléctricas Nelson Vera EIRL","rut":"77.657.957-2","fono":"992868865","correo":"nveratecnico@gmail.com","ciudad":"Viña del Mar","banco":"Estado","tipo_cuenta":"Cuenta Corriente","numero_cuenta":"23500298880","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":21,"fields":{"nombre":"Patricio Rivera","nombre_empresa":"Inversiones Power Security","rut":"78.005.813-7","fono":"322687498","correo":"noragom@hotmail.com","ciudad":"Viña del Mar","banco":"Santander","tipo_cuenta":"CTA CTE","numero_cuenta":"00009552595-4","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":22,"fields":{"nombre":"Roberto Barrera","nombre_empresa":"Sociedad Comercial PYB Ltda","rut":"76.303.698-7","fono":"","correo":"fortaleza_seguridad07@yahoo.es","ciudad":"Santiago","banco":"BCI","tipo_cuenta":"Cuenta Corriente","numero_cuenta":"48826791","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":23,"fields":{"nombre":"Rodrigo Araya","nombre_empresa":"Seguridad Electronica Janette Mella E.I.R.L.","rut":"76.905.995-4","fono":"56954336123","correo":"pbs.seguridad@gmail.com","ciudad":"Viña del Mar","banco":"Santander","tipo_cuenta":"CTA CTE","numero_cuenta":"86635879","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":24,"fields":{"nombre":"Rodrigo Duprat","nombre_empresa":"Nelson Rodrigo Duprat Carrasco","rut":"16.187.101-k","fono":"56971527627","correo":"nrodrigoduprat@gmail.com","ciudad":"Temuco","banco":"Falabella","tipo_cuenta":"Cuenta Vista","numero_cuenta":"58300067193","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":25,"fields":{"nombre":"Samuel Donoso","nombre_empresa":"Skadi spa","rut":"77.971.742-9","fono":"978634379","correo":"samueldonosogalaz@gmail.com","ciudad":"Coyhaique","banco":"Banco de Chile","tipo_cuenta":"Cuenta Vista","numero_cuenta":"00-050-20241-86","categoria":"","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":26,"fields":{"nombre":"Sergio Muñoz","nombre_empresa":"Sergio Muñoz Araya","rut":"10.907.313-k","fono":"","correo":"Sembros67@gmail.com","ciudad":"Santiago","banco":"Consorcio","tipo_cuenta":"Cuenta Vista","numero_cuenta":"4010442391","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":27,"fields":{"nombre":"Jose Rivera","nombre_empresa":"Sistemas de Seguridad José Rivera L. EIRL","rut":"76169077-9","fono":"56976672774","correo":"jrivera@systemtelecom.cl","ciudad":"Santiago","banco":"Estado","tipo_cuenta":"Cuenta Corriente","numero_cuenta":"8578834","categoria":"","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":28,"fields":{"nombre":"Defcon","nombre_empresa":"VISUALIZACION Y SEGURIDAD GLOBAL SPA","rut":"78.080.103-4","fono":"977917236","correo":"JCROMERO@VSG.CL","ciudad":"Santiago","banco":"Santander","tipo_cuenta":"Cuenta Corriente","numero_cuenta":"97194157","categoria":"","fecha_creacion": "2026-01-01T00:00:00Z"}},
+
+{"model":"servicios.contratista","pk":29,"fields":{"nombre":"Patricio Gonzalez","nombre_empresa":"Acces Technology SPA","rut":"77.262.298-8","fono":"56991992833","correo":"contacto@accesstechnology.cl","ciudad":"Santiago","banco":"Estado","tipo_cuenta":"Vista","numero_cuenta":"902-7-038986-3","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}}
+]

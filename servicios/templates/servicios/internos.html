@@ -5,13 +5,34 @@
 
 {% block content %}
 
-<h2 class="mb-4">Servicios Técnicos Internos</h2>
+<h2 class="mb-4 text-center">Servicios Técnicos por Internos</h2>
 
-<form method="get">
+<form method="get" class="row mb-4">
 
-<select name="tecnico" class="form-select mb-3" onchange="this.form.submit()">
+<!-- FILTRO MES -->
+<div class="col-md-4">
 
-<option value="">Seleccione técnico</option>
+<select name="carga" class="form-select" onchange="this.form.submit()">
+
+<option value="">Todos los meses</option>
+
+{% for c in cargas %}
+<option value="{{ c.id }}" {% if carga_id == c.id|stringformat:"s" %}selected{% endif %}>
+{{ c.nombre }}
+</option>
+{% endfor %}
+
+</select>
+
+</div>
+
+
+<!-- FILTRO TECNICO -->
+<div class="col-md-4">
+
+<select name="tecnico" class="form-select" onchange="this.form.submit()">
+
+<option value="">Todos los técnicos</option>
 
 {% for t in tecnicos %}
 <option value="{{ t }}" {% if tecnico_seleccionado == t %}selected{% endif %}>
@@ -21,7 +42,30 @@
 
 </select>
 
+</div>
+
+
+<!-- FILTRO TIPO SERVICIO -->
+<div class="col-md-4">
+
+<select name="tipo_servicio" class="form-select" onchange="this.form.submit()">
+
+<option value="">Todos los servicios</option>
+
+<option value="PREVENTIV" {% if tipo_servicio == "PREVENTIV" %}selected{% endif %}>
+Preventivas
+</option>
+
+<option value="CORRECTIV" {% if tipo_servicio == "CORRECTIV" %}selected{% endif %}>
+Correctivas
+</option>
+
+</select>
+
+</div>
+
 </form>
+
 
 <div class="row mb-4">
 
@@ -69,6 +113,7 @@ $ {{ resumen.costo_total|default:0|floatformat:0|intcomma }}
 <th>Número</th>
 <th>Fecha Finalización</th>
 <th>Cuenta First</th>
+<th>Ténico</th>
 <th>Nombre Cuenta</th>
 <th>Provincia-Estado</th>
 <th>Tipo Servicio</th>
@@ -91,6 +136,7 @@ $ {{ resumen.costo_total|default:0|floatformat:0|intcomma }}
 <td>{{ s.fecha_finalizacion|date:"d/m/Y H:i" }}</td>
 
 <td>{{ s.cuenta_contable }}</td>
+<td>{{ s.tecnico }}</td>
 
 <td>{{ s.cuenta }}</td>
 

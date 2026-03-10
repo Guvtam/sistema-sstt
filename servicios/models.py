@@ -28,17 +28,17 @@ class Contratista(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)  # Para saber cuándo se agregó
 
     def __str__(self):
-        return f"{self.nombre} - {self.rut}"
+        return f"{self.nombre} - {self.nombre_empresa}"
 
 
 class ServicioTecnico(models.Model):
+
     carga = models.ForeignKey(
         CargaMensual,
         on_delete=models.CASCADE,
         related_name="servicios"
     )
 
-    # NUEVO: ForeignKey a Contratista
     contratista = models.ForeignKey(
         Contratista,
         on_delete=models.SET_NULL,
@@ -69,11 +69,17 @@ class ServicioTecnico(models.Model):
     valor = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     costo_mano_obra = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     fecha_pago = models.DateTimeField(null=True, blank=True)
+
+    # MONTO ORIGINAL DEL EXCEL (NO SE MODIFICA)
+    valor_pago_original = models.IntegerField(null=True, blank=True)
+
+    # MONTO QUE SE PUEDE EDITAR PARA PAGAR
     valor_pago_tecnico = models.IntegerField(null=True, blank=True)
 
     tiempo_trabajo_total = models.CharField(max_length=100, null=True, blank=True)
     cuenta_contable = models.CharField(max_length=20, null=True, blank=True)
     numero_incidencias_dia = models.IntegerField(default=0)
+
     ESTADO_PAGO_CHOICES = [
         ("aprobado", "Aprobado"),
         ("revision", "En Revisión"),
@@ -89,27 +95,3 @@ class ServicioTecnico(models.Model):
     def __str__(self):
         cuenta = self.cuenta_contable if self.cuenta_contable else "Sin cuenta"
         return f"{self.numero} - {cuenta}"
-""""
-    SEMAFORO_CHOICES = [
-        ('verde', 'Verde'),
-        ('amarillo', 'Amarillo'),
-        ('rojo', 'Rojo'),
-    ]
-
-    semaforo = models.CharField(
-        max_length=10,
-        choices=SEMAFORO_CHOICES,
-        null=True,
-        blank=True
-    )
-
-    
-    
-class Tecnico(models.Model):
-    nombre = models.CharField(...)
-    tipo = models.CharField(choices=[("interno","Interno"),("externo","Externo")])
-
-
-
-
-"""

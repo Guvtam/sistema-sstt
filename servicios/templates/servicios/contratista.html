@@ -4,220 +4,400 @@
 
 {% block content %}
 
-<h2 class="mb-4">Servicios Técnicos por Contratista</h2>
+<h2 class="mb-4 text-center">Servicios Técnicos por Contratista</h2>
 
-<!-- CONTENEDOR FIJO ARRIBA -->
-<div class="sticky-top-container p-3 mb-2 bg-light">
 
-    <!-- SELECTOR CONTRATISTA -->
-    <form method="get">
-        <select name="contratista_id" class="form-select mb-3" onchange="this.form.submit()">
-            <option value="">Seleccione contratista</option>
-            {% for c in contratistas %}
-            <option value="{{ c.id }}" {% if contratista_id == c.id|stringformat:"s" %}selected{% endif %}>
-                {{ c.nombre }}
+
+<form method="get" class="row mb-4">
+
+    <div class="col-md-3">
+        <select name="carga" class="form-select" onchange="this.form.submit()">
+
+            <option value="">Todos los meses</option>
+
+            {% for c in cargas %}
+            <option value="{{ c.id }}" {% if carga_id == c.id|stringformat:"s" %}selected{% endif %}>
+            {{ c.nombre }}
             </option>
             {% endfor %}
+
         </select>
-    </form>
+    </div>
+
+    <div class="col-md-3">
+        <select name="contratista_id" class="form-select" onchange="this.form.submit()">
+            <option value="">Seleccione contratista</option>
+
+            {% for c in contratistas %}
+            <option value="{{ c.id }}" {% if contratista_id == c.id|stringformat:"s" %}selected{% endif %}>
+            {{ c.nombre }}
+            </option>
+            {% endfor %}
+
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <select name="tipo_servicio" class="form-select" onchange="this.form.submit()">
+
+            <option value="">Todos los tipos servicios</option>
+
+            <option value="PREVENTIV" {% if tipo_servicio == "PREVENTIV" %}selected{% endif %}>
+            Preventivas
+            </option>
+
+            <option value="CORRECTIV" {% if tipo_servicio == "CORRECTIV" %}selected{% endif %}>
+            Correctivas
+            </option>
+
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <select name="estado_pago" class="form-select" onchange="this.form.submit()">
+
+            <option value="">Todos los estados</option>
+
+            <option value="aprobado" {% if estado_pago == "aprobado" %}selected{% endif %}>
+            Aprobados
+            </option>
+
+            <option value="revision" {% if estado_pago == "revision" %}selected{% endif %}>
+            En revisión
+            </option>
+
+            <option value="rechazado" {% if estado_pago == "rechazado" %}selected{% endif %}>
+            Rechazados
+            </option>
+
+        </select>
+    </div>
+
+</form>
+
+<!-- CONTENEDOR SUPERIOR -->
+<div class="sticky-top-container p-3 mb-2 bg-light">
 
     {% if contratista %}
     <div class="row mb-3">
+
         <div class="col-md-3">
             <div class="kpi-card">
-                <div class="kpi-title">Contratista</div>
-                <div class="kpi-value">{{ contratista.nombre }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="kpi-title">Ubicación</div>
-                <div class="kpi-value">{{ contratista.ciudad }}</div>
-            </div>
+            <div class="kpi-title">Contratista</div>
+            <div class="kpi-value">{{ contratista.nombre }}</div>
         </div>
     </div>
+
+    <div class="col-md-3">
+        <div class="kpi-card">
+            <div class="kpi-title">Ubicación</div>
+            <div class="kpi-value">{{ contratista.ciudad }}</div>
+        </div>
+    </div>
+
+</div>
     {% endif %}
 
-    {% if resumen %}
-    <div class="row mb-3">
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="kpi-title">Total Mantenciones</div>
-                <div class="kpi-value" id="total_mantenciones">{{ resumen.total_mantenciones }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="kpi-title text-success">Preventivas</div>
-                <div class="kpi-value text-success" id="total_preventivas">${{ resumen.monto_preventivas|default:0|floatformat:0|intcomma }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="kpi-title text-warning">Correctivas</div>
-                <div class="kpi-value text-warning" id="total_correctivas">${{ resumen.monto_correctivas|default:0|floatformat:0|intcomma }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="kpi-title text-primary">Total $</div>
-                <div class="kpi-value text-primary" id="monto_total">${{ resumen.monto_total|default:0|floatformat:0|intcomma }}</div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Montos por estado -->
-    <div class="row mb-3">
-        <div class="col-md-4">
-            <div class="kpi-card border-success">
-                <div class="kpi-title text-success">✔ Aprobado</div>
-                <p>Cantidad: <strong>{{ resumen.cantidad_aprobado }}</strong></p>
-                <p>Total: <strong id="monto_aprobado">${{ resumen.monto_aprobado|floatformat:0|intcomma }}</strong></p>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="kpi-card border-warning">
-                <div class="kpi-title text-warning">⏳ En Revisión</div>
-                <p>Cantidad: <strong>{{ resumen.cantidad_revision }}</strong></p>
-                <p>Total: <strong id="monto_revision">${{ resumen.monto_revision|floatformat:0|intcomma }}</strong></p>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="kpi-card border-danger">
-                <div class="kpi-title text-danger">✖ Rechazado</div>
-                <p>Cantidad: <strong>{{ resumen.cantidad_rechazado }}</strong></p>
-                <p>Total: <strong id="monto_rechazado">${{ resumen.monto_rechazado|floatformat:0|intcomma }}</strong></p>
-            </div>
-        </div>
-    </div>
-    {% endif %}
+{% if resumen %}
 
-</div> <!-- Fin sticky-top -->
+<div class="row g-3 mb-4">
 
-<!-- TABLA CON SCROLL Y EDICIÓN INLINE -->
-<div class="table-scrollable">
-    <table class="table table-bordered table-hover">
-        <thead class="table-dark sticky-table-header">
-            <tr>
-                <th>Número</th>
-                <th>Fecha Finalización</th>
-                <th>Cuenta First</th>
-                <th>Nombre Cuenta</th>
-                <th>Provincia - Estado</th>
-                <th>Tipo Servicio</th>
-                <th>Servicio</th>
-                <th class="col-observaciones">Observaciones</th>
-                <th>Valor Pago Técnico</th>
-                <th>Incidencias</th>
-                <th>Estado Pago</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for s in servicios %}
-            <tr>
-                <td>{{ s.numero }}</td>
-                <td>{{ s.fecha_finalizacion|date:"d/m/Y H:i" }}</td>
-                <td>{{ s.cuenta_contable }}</td>
-                <td>{{ s.cuenta }}</td>
-                <td>{{ s.provincia_estado }}</td>
-                <td>{{ s.tipo_servicio }}</td>
-                <td>{{ s.servicio }}</td>
-                <td class="col-observaciones">{{ s.observaciones }}</td>
-
-                <!-- Valor Pago Técnico Editable -->
-                <td>
-                    <span class="monto-texto" id="texto-{{ s.id }}">
-                        $ {{ s.valor_pago_tecnico|floatformat:0|intcomma }}
-                    </span>
-
-                    <input type="number" class="form-control monto-input d-none" id="input-{{ s.id }}" value="{{ s.valor_pago_tecnico }}">
-
-                    <button type="button" class="btn btn-sm btn-outline-primary" id="editar-{{ s.id }}" onclick="mostrarEdicion({{ s.id }})">✏️</button>
-                    <button type="button" class="btn btn-sm btn-success d-none" id="guardar-{{ s.id }}" onclick="guardarMonto({{ s.id }})">💾</button>
-                    <button type="button" class="btn btn-sm btn-secondary d-none" id="cancelar-{{ s.id }}" onclick="cancelarEdicion({{ s.id }})">❌</button>
-                </td>
-
-                <!-- Incidencias -->
-                <td>
-                    {% if s.numero_incidencias_dia > 2 %}
-                        <span class="badge bg-danger">{{ s.numero_incidencias_dia }}</span>
-                    {% elif s.numero_incidencias_dia == 2 %}
-                        <span class="badge bg-warning text-dark">{{ s.numero_incidencias_dia }}</span>
-                    {% else %}
-                        <span class="badge bg-success">{{ s.numero_incidencias_dia }}</span>
-                    {% endif %}
-                </td>
-
-                <!-- Estado Pago -->
-                <td>
-                    <form method="post" action="{% url 'cambiar_estado_pago' s.id %}">
-                        {% csrf_token %}
-                        <select name="estado_pago" onchange="this.form.submit()" class="form-select">
-                            {% for key, value in s.ESTADO_PAGO_CHOICES %}
-                            <option value="{{ key }}" {% if s.estado_pago == key %}selected{% endif %}>{{ value }}</option>
-                            {% endfor %}
-                        </select>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<!-- TOTAL MANTENCIONES -->
+<div class="col-md-3">
+<div class="kpi-card text-center">
+<div class="kpi-title">Total Mantenciones</div>
+<div class="kpi-value" id="total_mantenciones">
+{{ resumen.total_mantenciones }}
+</div>
+</div>
 </div>
 
-<!-- JS para edición inline y actualización de resumen -->
+<!-- PREVENTIVAS -->
+<div class="col-md-3">
+<div class="kpi-card text-center border-success">
+
+<div class="kpi-title text-success">Preventivas</div>
+
+<div class="kpi-value">
+{{ resumen.total_preventivas }}
+</div>
+
+<div class="small text-muted mt-2">Monto</div>
+
+<div class="kpi-value text-success" id="total_preventivas">
+${{ resumen.monto_preventivas|default:0|floatformat:0|intcomma }}
+</div>
+
+</div>
+</div>
+
+<!-- CORRECTIVAS -->
+<div class="col-md-3">
+<div class="kpi-card text-center border-warning">
+
+<div class="kpi-title text-warning">Correctivas</div>
+
+<div class="kpi-value">
+{{ resumen.total_correctivas }}
+</div>
+
+<div class="small text-muted mt-2">Monto</div>
+
+<div class="kpi-value text-warning" id="total_correctivas">
+${{ resumen.monto_correctivas|default:0|floatformat:0|intcomma }}
+</div>
+
+</div>
+</div>
+
+<!-- TOTAL -->
+<div class="col-md-3">
+<div class="kpi-card text-center">
+
+<div class="kpi-title">Total a pagar $</div>
+
+<div class="kpi-value" id="monto_total">
+${{ resumen.monto_total|default:0|floatformat:0|intcomma }}
+</div>
+
+</div>
+</div>
+
+</div>
+
+
+<!-- ESTADO PAGOS -->
+
+<div class="row mb-3">
+
+<div class="col-md-4">
+<div class="kpi-card border-success">
+<div class="kpi-title text-success">✔ Aprobado</div>
+<p>Cantidad: <strong>{{ resumen.cantidad_aprobado }}</strong></p>
+<p>Total: <strong id="monto_aprobado">${{ resumen.monto_aprobado|floatformat:0|intcomma }}</strong></p>
+</div>
+</div>
+
+<div class="col-md-4">
+<div class="kpi-card border-warning">
+<div class="kpi-title text-warning">⏳ En Revisión</div>
+<p>Cantidad: <strong>{{ resumen.cantidad_revision }}</strong></p>
+<p>Total: <strong id="monto_revision">${{ resumen.monto_revision|floatformat:0|intcomma }}</strong></p>
+</div>
+</div>
+
+<div class="col-md-4">
+<div class="kpi-card border-danger">
+<div class="kpi-title text-danger">✖ Rechazado</div>
+<p>Cantidad: <strong>{{ resumen.cantidad_rechazado }}</strong></p>
+<p>Total: <strong id="monto_rechazado">${{ resumen.monto_rechazado|floatformat:0|intcomma }}</strong></p>
+</div>
+</div>
+
+</div>
+
+{% endif %}
+
+</div>
+
+
+<!-- TABLA -->
+<div class="table-scrollable">
+
+<table class="table table-bordered table-hover">
+
+<thead class="table-dark sticky-table-header">
+<tr>
+<th>Número</th>
+<th>Fecha Finalización</th>
+<th>Cuenta First</th>
+<th>Nombre Cuenta</th>
+<th>Provincia - Estado</th>
+<th>Tipo Servicio</th>
+<th>Servicio</th>
+<th class="col-observaciones">Observaciones</th>
+<th>Valor Pago Técnico</th>
+<th>Incidencias</th>
+<th>Estado Pago</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for s in servicios %}
+
+<tr>
+
+<td>{{ s.numero }}</td>
+
+<td>{{ s.fecha_finalizacion|date:"d/m/Y H:i" }}</td>
+
+<td>{{ s.cuenta_contable }}</td>
+
+<td>{{ s.cuenta }}</td>
+
+<td>{{ s.provincia_estado }}</td>
+
+<td>{{ s.tipo_servicio }}</td>
+
+<td>{{ s.servicio }}</td>
+
+<td class="col-observaciones">{{ s.observaciones }}</td>
+
+<td>
+
+<span class="monto-texto" id="texto-{{ s.id }}">
+$ {{ s.valor_pago_tecnico|floatformat:0|intcomma }}
+</span>
+
+<input type="number"
+class="form-control monto-input d-none"
+id="input-{{ s.id }}"
+value="{{ s.valor_pago_tecnico }}">
+
+<button type="button"
+class="btn btn-sm btn-outline-primary"
+id="editar-{{ s.id }}"
+onclick="mostrarEdicion({{ s.id }})">
+✏️
+</button>
+
+<button type="button"
+class="btn btn-sm btn-success d-none"
+id="guardar-{{ s.id }}"
+onclick="guardarMonto({{ s.id }})">
+💾
+</button>
+
+<button type="button"
+class="btn btn-sm btn-secondary d-none"
+id="cancelar-{{ s.id }}"
+onclick="cancelarEdicion({{ s.id }})">
+❌
+</button>
+
+</td>
+
+
+<td>
+
+{% if s.numero_incidencias_dia > 2 %}
+<span class="badge bg-danger">{{ s.numero_incidencias_dia }}</span>
+
+{% elif s.numero_incidencias_dia == 2 %}
+<span class="badge bg-warning text-dark">{{ s.numero_incidencias_dia }}</span>
+
+{% else %}
+<span class="badge bg-success">{{ s.numero_incidencias_dia }}</span>
+{% endif %}
+
+</td>
+
+
+<td>
+
+<form method="post" action="{% url 'cambiar_estado_pago' s.id %}">
+{% csrf_token %}
+
+<select name="estado_pago" onchange="this.form.submit()" class="form-select">
+
+{% for key,value in s.ESTADO_PAGO_CHOICES %}
+<option value="{{ key }}" {% if s.estado_pago == key %}selected{% endif %}>
+{{ value }}
+</option>
+{% endfor %}
+
+</select>
+
+</form>
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+
 <script>
+
 function mostrarEdicion(id){
-    document.getElementById('texto-' + id).classList.add('d-none');
-    document.getElementById('input-' + id).classList.remove('d-none');
-    document.getElementById('editar-' + id).classList.add('d-none');
-    document.getElementById('guardar-' + id).classList.remove('d-none');
-    document.getElementById('cancelar-' + id).classList.remove('d-none');
+
+document.getElementById('texto-'+id).classList.add('d-none');
+document.getElementById('input-'+id).classList.remove('d-none');
+document.getElementById('editar-'+id).classList.add('d-none');
+document.getElementById('guardar-'+id).classList.remove('d-none');
+document.getElementById('cancelar-'+id).classList.remove('d-none');
+
 }
 
 function cancelarEdicion(id){
-    document.getElementById('texto-' + id).classList.remove('d-none');
-    document.getElementById('input-' + id).classList.add('d-none');
-    document.getElementById('editar-' + id).classList.remove('d-none');
-    document.getElementById('guardar-' + id).classList.add('d-none');
-    document.getElementById('cancelar-' + id).classList.add('d-none');
+
+document.getElementById('texto-'+id).classList.remove('d-none');
+document.getElementById('input-'+id).classList.add('d-none');
+document.getElementById('editar-'+id).classList.remove('d-none');
+document.getElementById('guardar-'+id).classList.add('d-none');
+document.getElementById('cancelar-'+id).classList.add('d-none');
+
 }
+
 
 function guardarMonto(id){
-    const valor = document.getElementById('input-' + id).value;
 
-    fetch("{% url 'editar_monto_tecnico' 0 %}".replace('0', id), {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: JSON.stringify({ valor_pago_tecnico: valor })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if(data.success){
-            // Actualiza monto en la tabla
-            document.getElementById('texto-' + id).innerText = '$ ' + parseFloat(valor).toLocaleString('es-CL', {maximumFractionDigits:0});
-            cancelarEdicion(id);
+const valor=document.getElementById('input-'+id).value;
 
-            // Actualiza todos los cuadros de resumen automáticamente
-            const r = data.resumen;
-            document.getElementById('total_mantenciones').innerText = r.total_mantenciones;
-            document.getElementById('total_preventivas').innerText = '$ ' + parseFloat(r.monto_preventivas).toLocaleString('es-CL', {maximumFractionDigits:0});
-            document.getElementById('total_correctivas').innerText = '$ ' + parseFloat(r.monto_correctivas).toLocaleString('es-CL', {maximumFractionDigits:0});
-            document.getElementById('monto_total').innerText = '$ ' + parseFloat(r.monto_total).toLocaleString('es-CL', {maximumFractionDigits:0});
-            document.getElementById('monto_aprobado').innerText = '$ ' + parseFloat(r.monto_aprobado).toLocaleString('es-CL', {maximumFractionDigits:0});
-            document.getElementById('monto_revision').innerText = '$ ' + parseFloat(r.monto_revision).toLocaleString('es-CL', {maximumFractionDigits:0});
-            document.getElementById('monto_rechazado').innerText = '$ ' + parseFloat(r.monto_rechazado).toLocaleString('es-CL', {maximumFractionDigits:0});
-        } else {
-            alert('Error al guardar monto: ' + (data.error || 'Desconocido'));
-        }
-    })
-    .catch(err => {
-        alert('Error al conectar con el servidor: ' + err);
-    });
+fetch("{% url 'editar_monto_tecnico' 0 %}".replace('0',id),{
+
+method:'POST',
+
+headers:{
+'Content-Type':'application/json',
+'X-CSRFToken':'{{ csrf_token }}'
+},
+
+body:JSON.stringify({valor_pago_tecnico:valor})
+
+})
+
+.then(res=>res.json())
+
+.then(data=>{
+
+if(data.success){
+
+document.getElementById('texto-'+id).innerText='$ '+parseFloat(valor).toLocaleString('es-CL',{maximumFractionDigits:0});
+
+cancelarEdicion(id);
+
+const r=data.resumen;
+
+document.getElementById('total_mantenciones').innerText=r.total_mantenciones;
+
+document.getElementById('total_preventivas').innerText='$ '+parseFloat(r.monto_preventivas).toLocaleString('es-CL',{maximumFractionDigits:0});
+
+document.getElementById('total_correctivas').innerText='$ '+parseFloat(r.monto_correctivas).toLocaleString('es-CL',{maximumFractionDigits:0});
+
+document.getElementById('monto_total').innerText='$ '+parseFloat(r.monto_total).toLocaleString('es-CL',{maximumFractionDigits:0});
+
+document.getElementById('monto_aprobado').innerText='$ '+parseFloat(r.monto_aprobado).toLocaleString('es-CL',{maximumFractionDigits:0});
+
+document.getElementById('monto_revision').innerText='$ '+parseFloat(r.monto_revision).toLocaleString('es-CL',{maximumFractionDigits:0});
+
+document.getElementById('monto_rechazado').innerText='$ '+parseFloat(r.monto_rechazado).toLocaleString('es-CL',{maximumFractionDigits:0});
+
 }
+
+})
+
+}
+
 </script>
+
 
 {% endblock %}
