@@ -59,3 +59,24 @@ box-shadow: 0 4px 10px rgba(0,0,0,0.2);
 #btnSubir:hover {
 background-color: #0b5ed7;
 }
+
+
+@media print {
+    /* ocultar lo que no va en el PDF */
+    form,
+    .sticky-top-container,
+    button,
+    nav,
+    .navbar-custom {
+        display: none !important;
+    }
+
+    /* que la tabla se vea completa */
+    .table-scrollable {
+        overflow: visible !important;
+    }
+
+    body {
+        background: white !important;
+    }
+}
