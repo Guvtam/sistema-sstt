@@ -11,5 +11,5 @@ urlpatterns = [
     path("actualizar-monto/<int:servicio_id>/", views.actualizar_monto, name="actualizar_monto"),
     path("internos/", views.internos, name="internos"),
     path('editar_monto_tecnico/<int:servicio_id>/', views.editar_monto_tecnico, name='editar_monto_tecnico'),
-    
+    path("contratista/pdf/", views.contratista_pdf, name="contratista_pdf"),
 ]

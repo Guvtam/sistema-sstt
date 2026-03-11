@@ -1,4 +1,3 @@
-
 import pandas as pd
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
@@ -13,6 +12,8 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 from django.template.loader import render_to_string
 from django.http import HttpResponse
+from xhtml2pdf import pisa
+from io import BytesIO
 
 
 
@@ -617,3 +618,54 @@ def editar_monto_tecnico(request, servicio_id):
 
 
 
+
+def contratista_pdf(request):
+
+    contratista_id = request.GET.get("contratista_id")
+    carga_id = request.GET.get("carga")
+    tipo_servicio = request.GET.get("tipo_servicio")
+    estado_pago = request.GET.get("estado_pago")
+
+    contratista_obj = get_object_or_404(Contratista, id=contratista_id) if contratista_id else None
+
+    servicios = ServicioTecnico.objects.all()
+
+    if carga_id:
+        servicios = servicios.filter(carga_id=carga_id)
+    if contratista_id:
+        servicios = servicios.filter(contratista_id=contratista_id)
+    if estado_pago:
+        servicios = servicios.filter(estado_pago=estado_pago)
+    if tipo_servicio:
+        servicios = servicios.filter(tipo_servicio__icontains=tipo_servicio)
+
+    servicios = servicios.order_by("fecha_finalizacion")
+
+    resumen = servicios.aggregate(
+        total_mantenciones=Count("id"),
+        total_preventivas=Count("id", filter=Q(tipo_servicio__icontains="PREVENTIV")),
+        total_correctivas=Count("id", filter=Q(tipo_servicio__icontains="CORRECTIV")),
+        monto_preventivas=Coalesce(Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="PREVENTIV")), Value(0)),
+        monto_correctivas=Coalesce(Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="CORRECTIV")), Value(0)),
+        monto_aprobado=Coalesce(Sum("valor_pago_tecnico", filter=Q(estado_pago="aprobado")), Value(0)),
+        monto_revision=Coalesce(Sum("valor_pago_tecnico", filter=Q(estado_pago="revision")), Value(0)),
+        monto_rechazado=Coalesce(Sum("valor_pago_tecnico", filter=Q(estado_pago="rechazado")), Value(0)),
+        cantidad_aprobado=Count("id", filter=Q(estado_pago="aprobado")),
+        cantidad_revision=Count("id", filter=Q(estado_pago="revision")),
+        cantidad_rechazado=Count("id", filter=Q(estado_pago="rechazado")),
+        monto_total=Coalesce(Sum("valor_pago_tecnico"), Value(0)),
+    )
+
+    html_string = render_to_string("servicios/contratista_pdf.html", {
+        "contratista": contratista_obj,
+        "servicios": servicios,
+        "resumen": resumen,
+    })
+
+    buffer = BytesIO()
+    pisa.CreatePDF(html_string, dest=buffer)
+    buffer.seek(0)
+
+    response = HttpResponse(buffer, content_type="application/pdf")
+    response["Content-Disposition"] = 'inline; filename="reporte_contratista.pdf"'
+    return response

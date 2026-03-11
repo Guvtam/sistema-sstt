@@ -6,9 +6,11 @@
 
 <h2 class="mb-4 text-center">Servicios Técnicos por Contratista</h2>
 
-<button onclick="window.print()" class="btn btn-danger mb-3">
+<a href="{% url 'contratista_pdf' %}?contratista_id={{ contratista_id }}&carga={{ carga_id }}&tipo_servicio={{ tipo_servicio }}&estado_pago={{ estado_pago }}" 
+   target="_blank" 
+   class="btn btn-danger mb-3">
     📄 Exportar PDF
-</button>
+</a>
 
 <form method="get" class="row mb-4">
 
