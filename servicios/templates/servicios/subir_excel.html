@@ -4,68 +4,87 @@
 
 {% block content %}
 
-<h3 class="mb-4">Carga Mensual de Servicios</h3>
+<h3 class="mb-4 text-center">Carga Mensual de Servicios</h3>
+
+<div class="row justify-content-center">
+<div class="col-md-8">
 
 <form method="post" enctype="multipart/form-data">
 
-{% csrf_token %}
+    {% csrf_token %}
 
-<div class="row">
+    <div class="row">
+        <div class="col-md-12">
+            <label class="form-label">Nombre carga</label>
+            <input type="text"
+                name="nombre_carga"
+                class="form-control"
+                placeholder="Ej: Servicios Enero 2026"
+                required>
+        </div>
+    </div>
 
-<div class="col-md-6">
+    <div class="row mt-3">
 
-<label class="form-label">Nombre carga</label>
+        <div class="col-md-6">
+            <label class="form-label">Mes</label>
+            <select name="mes" class="form-select" required>
+                <option value="">Seleccione mes</option>
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3">Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+            </select>
+        </div>
 
-<input type="text"
-name="nombre_carga"
-class="form-control"
-placeholder="Ej: Servicios Enero 2026"
-required>
+        <div class="col-md-6">
+            <label class="form-label">Año</label>
+            <select name="anio" class="form-select" required>
+                <option value="">Seleccione año</option>
+                <option value="2024">2024</option>
+                <option value="2025">2025</option>
+                <option value="2026">2026</option>
+                <option value="2027">2027</option>
+            </select>
+        </div>
 
-</div>
+    </div>
 
-</div>
+    <div class="row mt-3">
 
-<div class="row mt-3">
+        <div class="col-md-6">
+            <label class="form-label">Archivo Servicios</label>
+            <input class="form-control" type="file" name="archivo1" required>
+        </div>
 
-<div class="col-md-6">
+        <div class="col-md-6">
+            <label class="form-label">Archivo Incidencias</label>
+            <input class="form-control" type="file" name="archivo2" required>
+        </div>
 
-<label class="form-label">Archivo Servicios</label>
+    </div>
 
-<input class="form-control" type="file" name="archivo1" required>
-
-</div>
-
-<div class="col-md-6">
-
-<label class="form-label">Archivo Incidencias</label>
-
-<input class="form-control" type="file" name="archivo2" required>
-
-</div>
-
-</div>
-
-<div class="mt-4">
-
-<button class="btn btn-primary">
-
-Procesar Archivos
-
-</button>
-
-</div>
+    <div class="mt-4 text-center">
+        <button class="btn btn-primary px-5">Procesar Archivos</button>
+    </div>
 
 </form>
 
 {% if mensaje %}
-
-<div class="alert alert-success mt-4">
-
-{{ mensaje }}
+<div class="alert alert-success mt-4 text-center">
+    {{ mensaje }}
+</div>
+{% endif %}
 
 </div>
-
-{% endif %}
+</div>
 
 {% endblock %}

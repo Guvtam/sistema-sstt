@@ -3,7 +3,8 @@ from django.db import models
 
 class CargaMensual(models.Model):
     nombre = models.CharField(max_length=150)
-   
+    mes = models.IntegerField(null=True, blank=True)
+    anio = models.IntegerField(null=True, blank=True)
     fecha_carga = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

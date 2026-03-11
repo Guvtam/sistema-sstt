@@ -80,6 +80,8 @@ def internos(request):
     if tecnico_seleccionado == "None":
         tecnico_seleccionado = None
     carga_id = request.GET.get("carga")
+    mes = request.GET.get("mes")
+    anio = request.GET.get("anio")
     tipo_servicio = request.GET.get("tipo_servicio")
 
     print("===================")
@@ -94,9 +96,12 @@ def internos(request):
 
     print("total sin filtros:", servicios.count())
 
-    if carga_id:
+   
+
+    if mes and anio:
+        servicios = servicios.filter(carga__mes=mes, carga__anio=anio)
+    elif carga_id:
         servicios = servicios.filter(carga_id=carga_id)
-        print("total con filtro carga:", servicios.count())
 
     if tecnico_seleccionado:
         servicios = servicios.filter(tecnico=tecnico_seleccionado)
@@ -126,7 +131,9 @@ def internos(request):
         "resumen": resumen,
         "tecnico_seleccionado": tecnico_seleccionado,
         "carga_id": carga_id,
-        "tipo_servicio": tipo_servicio
+        "tipo_servicio": tipo_servicio,
+        "mes": mes,
+        "anio": anio,
     })
 
 # ==============================
@@ -140,6 +147,8 @@ def subir_excel(request):
     if request.method == "POST":
 
         nombre_carga = request.POST.get("nombre_carga")
+        mes = request.POST.get("mes")
+        anio = request.POST.get("anio")
         archivo1 = request.FILES.get("archivo1")
         archivo2 = request.FILES.get("archivo2")
 
@@ -148,7 +157,11 @@ def subir_excel(request):
             # eliminar carga anterior con mismo nombre
             CargaMensual.objects.filter(nombre=nombre_carga).delete()
 
-            carga = CargaMensual.objects.create(nombre=nombre_carga)
+            carga = CargaMensual.objects.create(
+                nombre=nombre_carga,
+                mes=mes,
+                anio=anio,
+                )
 
             dataframes = []
 
@@ -305,12 +318,16 @@ def buscador_servicios(request):
 
     query = request.GET.get("q")
     carga_id = request.GET.get("carga")
+    mes = request.GET.get("mes")
+    anio = request.GET.get("anio")
 
     servicios = ServicioTecnico.objects.all().order_by("-fecha_finalizacion")
 
     # filtro por carga
     if carga_id:
         servicios = servicios.filter(carga_id=carga_id)
+    if mes and anio:
+        servicios = servicios.filter(carga__mes=mes, carga__anio=anio)
 
     # buscador
     if query:
@@ -328,7 +345,9 @@ def buscador_servicios(request):
         "servicios": servicios,
         "query": query,
         "cargas": cargas,
-        "carga_seleccionada": carga_id
+        "carga_seleccionada": carga_id,
+        "mes":mes,
+        "anio": anio,
     })
 
 
@@ -346,6 +365,8 @@ def contratista(request):
     ).distinct().order_by("nombre")
 
     carga_id = request.GET.get("carga")
+    mes= request.GET.get("mes")
+    anio= request.GET.get("anio")
     contratista_id = request.GET.get("contratista_id")
     estado_pago = request.GET.get("estado_pago")
     tipo_servicio = request.GET.get("tipo_servicio")
@@ -353,7 +374,11 @@ def contratista(request):
     servicios = ServicioTecnico.objects.all()
 
     # FILTRO MES
-    if carga_id:
+    
+
+    if mes and anio:
+        servicios = servicios.filter(carga__mes=mes, carga__anio=anio)
+    elif carga_id:
         servicios = servicios.filter(carga_id=carga_id)
 
     # FILTRO CONTRATISTA
@@ -448,6 +473,8 @@ def contratista(request):
         "contratista_id": contratista_id,
         "carga_id": carga_id,
         "tipo_servicio": tipo_servicio,
+        "mes" : mes,
+        "anio": anio,
     })
 
 # ==============================
@@ -623,6 +650,8 @@ def contratista_pdf(request):
 
     contratista_id = request.GET.get("contratista_id")
     carga_id = request.GET.get("carga")
+    mes = request.GET.get("mes")
+    anio = request.GET.get("anio")
     tipo_servicio = request.GET.get("tipo_servicio")
     estado_pago = request.GET.get("estado_pago")
 
@@ -634,6 +663,9 @@ def contratista_pdf(request):
         servicios = servicios.filter(carga_id=carga_id)
     if contratista_id:
         servicios = servicios.filter(contratista_id=contratista_id)
+    if mes and anio:
+        servicios = servicios.filter(carga__mes=mes, carga__anio=anio)
+    
     if estado_pago:
         servicios = servicios.filter(estado_pago=estado_pago)
     if tipo_servicio:
