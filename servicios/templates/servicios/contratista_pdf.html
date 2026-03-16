@@ -1,297 +1,459 @@
 {% load humanize %}
+
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
 <meta charset="utf-8">
+
 <style>
 
-    @page {
-        size: A4 landscape;
-        margin: 1.5cm;
-    }
+@page {
+    size: A4 landscape;
+    margin: 1.5cm;
+}
 
-    body {
-        font-family: Arial, sans-serif;
-        font-size: 10px;
-        color: #1e293b;
-    }
+body {
+    font-family: Arial, sans-serif;
+    font-size: 10px;
+    color: #1e293b;
+}
 
-    /* ENCABEZADO */
-    .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        border-bottom: 2px solid #1e293b;
-        padding-bottom: 10px;
-        margin-bottom: 14px;
-    }
+/* =========================
+ENCABEZADO
+========================= */
 
-    .header h1 {
-        font-size: 16px;
-        margin: 0 0 4px 0;
-        color: #1e293b;
-    }
+.header {
+    border-bottom: 2px solid #1e293b;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+}
 
-    .header p {
-        margin: 2px 0;
-        font-size: 10px;
-        color: #475569;
-    }
+.header h1 {
+    font-size: 16px;
+    margin: 0 0 4px 0;
+}
 
-    .header .fecha {
-        font-size: 10px;
-        color: #64748b;
-        text-align: right;
-    }
+.header p {
+    margin: 2px 0;
+    color: #475569;
+}
 
-    /* DATOS CONTRATISTA */
-    .contratista-box {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 6px;
-        padding: 10px 14px;
-        margin-bottom: 14px;
-    }
+.fecha {
+    font-size: 10px;
+    color: #64748b;
+}
 
-    .contratista-box table {
-        width: 100%;
-        border-collapse: collapse;
-    }
+.filtros {
+    margin-top: 6px;
+    font-size: 10px;
+    color: #334155;
+}
 
-    .contratista-box td {
-        padding: 3px 10px;
-        font-size: 10px;
-    }
+/* =========================
+DATOS CONTRATISTA
+========================= */
 
-    .contratista-box td strong {
-        color: #64748b;
-        font-size: 9px;
-        text-transform: uppercase;
-        display: block;
-    }
+.contratista-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 10px;
+    margin-bottom: 14px;
+}
 
-    /* RESUMEN */
-    .resumen-box {
-        margin-bottom: 16px;
-    }
+.contratista-box table {
+    width: 100%;
+    border-collapse: collapse;
+}
 
-    .resumen-box h3 {
-        font-size: 11px;
-        color: #64748b;
-        text-transform: uppercase;
-        margin: 0 0 6px 0;
-        letter-spacing: 0.5px;
-    }
+.contratista-box td {
+    padding: 4px 10px;
+    font-size: 10px;
+}
 
-    .resumen-table {
-        width: 320px;
-        border-collapse: collapse;
-        font-size: 10px;
-    }
+.contratista-box strong {
+    color: #64748b;
+    font-size: 9px;
+    text-transform: uppercase;
+    display: block;
+}
 
-    .resumen-table th {
-        background: #1e293b;
-        color: white;
-        padding: 5px 12px;
-        text-align: left;
-        font-size: 10px;
-    }
+/* =========================
+RESUMEN
+========================= */
 
-    .resumen-table th.right {
-        text-align: right;
-    }
+.resumen-box {
+    margin-bottom: 16px;
+}
 
-    .resumen-table td {
-        padding: 5px 12px;
-        border-bottom: 1px solid #e2e8f0;
-    }
+.resumen-box h3 {
+    font-size: 11px;
+    color: #64748b;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
 
-    .resumen-table td.right {
-        text-align: right;
-    }
+.resumen-table {
+    width: 320px;
+    border-collapse: collapse;
+    font-size: 10px;
+}
 
-    .resumen-table tr.preventiva td {
-        color: #16a34a;
-    }
+.resumen-table th {
+    background: #1e293b;
+    color: white;
+    padding: 5px 12px;
+    text-align: left;
+}
 
-    .resumen-table tr.correctiva td {
-        color: #d97706;
-    }
+.resumen-table th.right {
+    text-align: right;
+}
 
-    .resumen-table tr.total td {
-        font-weight: bold;
-        background: #f1f5f9;
-        border-top: 2px solid #1e293b;
-    }
+.resumen-table td {
+    padding: 5px 12px;
+    border-bottom: 1px solid #e2e8f0;
+}
 
-    /* TABLA SERVICIOS */
-    .servicios-title {
-        font-size: 11px;
-        color: #64748b;
-        text-transform: uppercase;
-        margin: 0 0 6px 0;
-        letter-spacing: 0.5px;
-    }
+.resumen-table td.right {
+    text-align: right;
+}
 
-    table.servicios {
-        width: 100%;
-        border-collapse: collapse;
-    }
+.preventiva td {
+    color: #16a34a;
+}
 
-    table.servicios th {
-        background: #1e293b;
-        color: white;
-        padding: 5px 6px;
-        font-size: 9px;
-        text-align: left;
-    }
+.correctiva td {
+    color: #d97706;
+}
 
-    table.servicios td {
-        padding: 4px 6px;
-        border-bottom: 1px solid #e2e8f0;
-        font-size: 9px;
-        vertical-align: top;
-    }
+.total td {
+    font-weight: bold;
+    background: #f1f5f9;
+}
 
-    table.servicios tr:nth-child(even) td {
-        background: #f8fafc;
-    }
+/* =========================
+TABLA SERVICIOS
+========================= */
 
-    table.servicios td.monto {
-        text-align: right;
-        white-space: nowrap;
-    }
+.servicios-title {
+    font-size: 11px;
+    color: #64748b;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
 
-    table.servicios td.obs {
-        max-width: 180px;
-        word-wrap: break-word;
-    }
+table.servicios {
+    width: 100%;
+    border-collapse: collapse;
+    
+}
 
-    .badge-verde { color: #16a34a; font-weight: bold; }
-    .badge-rojo  { color: #dc2626; font-weight: bold; }
-    .badge-amarillo { color: #d97706; font-weight: bold; }
+table.servicios th {
+    background: #1e293b;
+    color: white;
+    padding: 5px 6px;
+    font-size: 9px;
+    text-align: left;
+}
 
+table.servicios td {
+    padding: 4px 6px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 9px;
+    vertical-align: top;
+}
+
+table.servicios tr:nth-child(even) td {
+    background: #f8fafc;
+}
+
+.obs {
+    white-space: normal;
+    word-wrap: break-word;
+    word-break: break-word;
+}
+
+.monto {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.badge-verde {
+    color: #16a34a;
+    font-weight: bold;
+}
+
+.badge-amarillo {
+    color: #d97706;
+    font-weight: bold;
+}
+
+.badge-rojo {
+    color: #dc2626;
+    font-weight: bold;
+}
+
+/* evitar que filas se corten */
+
+tr {
+    page-break-inside: avoid;
+}
+
+/* limitar columnas que crecen mucho */
+
+.servicios td:nth-child(4),
+.servicios th:nth-child(4) {
+    width: 14%;
+}
+
+.servicios td:nth-child(7),
+.servicios th:nth-child(7) {
+    width: 10%;
+}
+
+/* hacer observaciones realmente grande */
+
+.servicios td:nth-child(8),
+.servicios th:nth-child(8) {
+    width: 35%;
+}
+
+.servicios td {
+    word-break: break-word;
+    white-space: normal;
+}
+
+.servicios td:nth-child(4) {
+    font-size:8px;
+}
 </style>
+
 </head>
+
 <body>
 
-<!-- ENCABEZADO -->
+<!-- =========================
+ENCABEZADO
+========================= -->
+
 <div class="header">
-    <div>
-        <h1>Reporte de Servicios Técnicos</h1>
-        <p>Sistema de Gestión de Pagos</p>
-    </div>
+
+    <h1>Reporte de Servicios Técnicos</h1>
+    <p>Sistema de Gestión de Pagos</p>
+
     <div class="fecha">
         Generado el {% now "d/m/Y H:i" %}
     </div>
+
+    <div class="filtros">
+
+        <strong>Periodo:</strong>
+        {{ mes|default:"Todos" }}/{{ anio|default:"Todos" }}
+
+        &nbsp;&nbsp; | &nbsp;&nbsp;
+
+        <strong>Estado de Pago:</strong>
+        {{ estado_pago|default:"Todos" }}
+
+    </div>
+
 </div>
 
-<!-- DATOS CONTRATISTA -->
+<!-- =========================
+DATOS CONTRATISTA
+========================= -->
+
 {% if contratista %}
+
 <div class="contratista-box">
-    <table>
-        <tr>
-            <td>
-                <strong>Contratista</strong>
-                {{ contratista.nombre }}
-            </td>
-            <td>
-                <strong>RUT</strong>
-                {{ contratista.rut }}
-            </td>
-            <td>
-                <strong>Empresa</strong>
-                {{ contratista.nombre_empresa }}
-            </td>
-            <td>
-                <strong>Ciudad</strong>
-                {{ contratista.ciudad }}
-            </td>
-            <td>
-                <strong>Correo</strong>
-                {{ contratista.correo }}
-            </td>
-            <td>
-                <strong>Fono</strong>
-                {{ contratista.fono }}
-            </td>
-        </tr>
-    </table>
+
+<table>
+
+<tr>
+
+<td>
+<strong>Contratista</strong>
+{{ contratista.nombre }}
+</td>
+
+<td>
+<strong>RUT</strong>
+{{ contratista.rut }}
+</td>
+
+<td>
+<strong>Empresa</strong>
+{{ contratista.nombre_empresa }}
+</td>
+
+<td>
+<strong>Ciudad</strong>
+{{ contratista.ciudad }}
+</td>
+
+<td>
+<strong>Correo</strong>
+{{ contratista.correo }}
+</td>
+
+<td>
+<strong>Fono</strong>
+{{ contratista.fono }}
+</td>
+
+</tr>
+
+</table>
+
 </div>
+
 {% endif %}
 
-<!-- RESUMEN -->
+<!-- =========================
+RESUMEN
+========================= -->
+
 <div class="resumen-box">
-    <h3>Resumen</h3>
-    <table class="resumen-table">
-        <thead>
-            <tr>
-                <th>Tipo</th>
-                <th class="right">Cantidad</th>
-                <th class="right">Monto</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr class="preventiva">
-                <td>Preventivas</td>
-                <td class="right">{{ resumen.total_preventivas }}</td>
-                <td class="right">${{ resumen.monto_preventivas|floatformat:0|intcomma }}</td>
-            </tr>
-            <tr class="correctiva">
-                <td>Correctivas</td>
-                <td class="right">{{ resumen.total_correctivas }}</td>
-                <td class="right">${{ resumen.monto_correctivas|floatformat:0|intcomma }}</td>
-            </tr>
-            <tr class="total">
-                <td>Total</td>
-                <td class="right">{{ resumen.total_mantenciones }}</td>
-                <td class="right">${{ resumen.monto_total|floatformat:0|intcomma }}</td>
-            </tr>
-        </tbody>
-    </table>
+
+<h3>Resumen</h3>
+
+<table class="resumen-table">
+
+<thead>
+
+<tr>
+<th>Tipo</th>
+<th class="right">Cantidad</th>
+<th class="right">Monto</th>
+</tr>
+
+</thead>
+
+<tbody>
+
+<tr class="preventiva">
+<td>Preventivas</td>
+<td class="right">{{ resumen.total_preventivas }}</td>
+<td class="right">${{ resumen.monto_preventivas|floatformat:0|intcomma }}</td>
+</tr>
+
+<tr class="correctiva">
+<td>Correctivas</td>
+<td class="right">{{ resumen.total_correctivas }}</td>
+<td class="right">${{ resumen.monto_correctivas|floatformat:0|intcomma }}</td>
+</tr>
+
+<tr class="total">
+<td>Total</td>
+<td class="right">{{ resumen.total_mantenciones }}</td>
+<td class="right">${{ resumen.monto_total|floatformat:0|intcomma }}</td>
+</tr>
+
+</tbody>
+
+</table>
+
 </div>
 
-<!-- TABLA SERVICIOS -->
-<p class="servicios-title">Detalle de Servicios</p>
+<!-- =========================
+TABLA SERVICIOS
+========================= -->
+
+<p class="servicios-title">
+Detalle de Servicios ({{ servicios|length }})
+</p>
+
 <table class="servicios">
-    <thead>
-        <tr>
-            <th>Número</th>
-            <th>Fecha Finalización</th>
-            <th>Cuenta First</th>
-            <th>Nombre Cuenta</th>
-            <th>Provincia - Estado</th>
-            <th>Tipo Servicio</th>
-            <th>Servicio</th>
-            <th>Observaciones</th>
-            <th>Valor Pago</th>
-            <th>Incidencias</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for s in servicios %}
-        <tr>
-            <td>{{ s.numero }}</td>
-            <td>{{ s.fecha_finalizacion|date:"d/m/Y H:i" }}</td>
-            <td>{{ s.cuenta_contable }}</td>
-            <td>{{ s.cuenta }}</td>
-            <td>{{ s.provincia_estado }}</td>
-            <td>{{ s.tipo_servicio }}</td>
-            <td>{{ s.servicio }}</td>
-            <td class="obs">{{ s.observaciones }}</td>
-            <td class="monto">${{ s.valor_pago_tecnico|floatformat:0|intcomma }}</td>
-            <td>
-                {% if s.numero_incidencias_dia > 2 %}
-                    <span class="badge-rojo">{{ s.numero_incidencias_dia }}</span>
-                {% elif s.numero_incidencias_dia == 2 %}
-                    <span class="badge-amarillo">{{ s.numero_incidencias_dia }}</span>
-                {% else %}
-                    <span class="badge-verde">{{ s.numero_incidencias_dia }}</span>
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
+
+<colgroup>
+<col style="width:5%">
+<col style="width:8%">
+<col style="width:6%">
+<col style="width:10%">
+<col style="width:10%">
+<col style="width:8%">
+<col style="width:8%">
+<col style="width:35%">   <!-- OBSERVACIONES -->
+<col style="width:8%">
+<col style="width:2%">
+</colgroup>
+
+<thead>
+
+<tr>
+
+<th>Número</th>
+<th>Fecha Finalización</th>
+<th>Cuenta First</th>
+<th>Nombre Cuenta</th>
+<th>Provincia - Estado</th>
+<th>Tipo Servicio</th>
+<th>Servicio</th>
+<th>Observaciones</th>
+<th>Valor Pago</th>
+<th>Incidencias</th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for s in servicios %}
+
+<tr>
+
+<td>{{ s.numero }}</td>
+
+<td>{{ s.fecha_finalizacion|date:"d/m/Y H:i" }}</td>
+
+<td>{{ s.cuenta_contable }}</td>
+
+<td>{{ s.cuenta }}</td>
+
+<td>{{ s.provincia_estado }}</td>
+
+<td>{{ s.tipo_servicio }}</td>
+
+<td>{{ s.servicio }}</td>
+
+<td class="obs">{{ s.observaciones }}</td>
+
+<td class="monto">
+${{ s.valor_pago_tecnico|floatformat:0|intcomma }}
+</td>
+
+<td>
+
+{% if s.numero_incidencias_dia > 2 %}
+
+<span class="badge-rojo">
+{{ s.numero_incidencias_dia }}
+</span>
+
+{% elif s.numero_incidencias_dia == 2 %}
+
+<span class="badge-amarillo">
+{{ s.numero_incidencias_dia }}
+</span>
+
+{% else %}
+
+<span class="badge-verde">
+{{ s.numero_incidencias_dia }}
+</span>
+
+{% endif %}
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
 </table>
 
 </body>

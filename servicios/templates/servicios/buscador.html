@@ -111,18 +111,19 @@ value="{{ query|default:'' }}"
             <td>$ {{ servicio.valor_pago_tecnico|default:0|floatformat:0|intcomma }}</td>
            
             <td>{{ servicio.cuenta_contable }}</td>
-            <td 
-            
-            {% if servicio.numero_incidencias_dia > 2 %}
-            <span class="badge bg-danger">{{ servicio.numero_incidencias_dia }}</span>
+            <td>
 
-            {% elif servicio.numero_incidencias_dia == 2 %}
-            <span class="badge bg-warning text-dark">{{ servicio.numero_incidencias_dia }}</span>
+                {% if servicio.numero_incidencias_dia > 2 %}
+                <span class="badge bg-danger">{{ servicio.numero_incidencias_dia }}</span>
 
-            {% else %}
-            <span class="badge bg-success">{{ servicio.numero_incidencias_dia }}</span>
-            {% endif %}
-            </td>
+                {% elif servicio.numero_incidencias_dia == 2 %}
+                <span class="badge bg-warning text-dark">{{ servicio.numero_incidencias_dia }}</span>
+
+                {% else %}
+                <span class="badge bg-success">{{ servicio.numero_incidencias_dia }}</span>
+                {% endif %}
+
+                </td>
         </tr>
         {% empty %}
         <tr>

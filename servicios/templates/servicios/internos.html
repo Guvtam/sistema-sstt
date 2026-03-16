@@ -40,7 +40,7 @@
 
 
 <!-- FILTRO TECNICO -->
-<div class="col-md-4">
+<div class="col-md-3">
 
 <select name="tecnico" class="form-select" onchange="this.form.submit()">
 
@@ -58,7 +58,7 @@
 
 
 <!-- FILTRO TIPO SERVICIO -->
-<div class="col-md-4">
+<div class="col-md-2">
 
 <select name="tipo_servicio" class="form-select" onchange="this.form.submit()">
 
@@ -79,38 +79,168 @@ Correctivas
 </form>
 
 
-<div class="row mb-4">
+<div class="row mb-3">
+
+
 
 <div class="col-md-3">
-<div class="kpi-card">
-<div class="kpi-title">Total Mantenciones</div>
-<div class="kpi-value">{{ resumen.total }}</div>
-</div>
-</div>
+        <div class="kpi-card text-center">
 
-<div class="col-md-3">
-<div class="kpi-card">
-<div class="kpi-title">Preventivas</div>
-<div class="kpi-value text-success">{{ resumen.preventivos }}</div>
-</div>
-</div>
+            <div class="kpi-title">Total Mantenciones</div>
 
-<div class="col-md-3">
-<div class="kpi-card">
-<div class="kpi-title">Correctivas</div>
-<div class="kpi-value text-warning">{{ resumen.correctivos }}</div>
-</div>
-</div>
+            <div class="kpi-value">
+                {{ resumen.total }}
+            </div>
 
-<div class="col-md-3">
-<div class="kpi-card">
-<div class="kpi-title">Costo Total</div>
-<div class="kpi-value text-primary">
-$ {{ resumen.costo_total|default:0|floatformat:0|intcomma }}
-</div>
-</div>
-</div>
+            <div class="small text-muted mt-2">Total</div>
 
+            <div class="kpi-value">
+                $ {{ resumen.costo_total|default:0|floatformat:0|intcomma }}
+            </div>
+
+        </div>
+    </div>
+
+
+
+    <div class="col-md-3">
+            <div class="kpi-card text-center">
+
+                <div class="kpi-title">Preventivas</div>
+
+                <div class="kpi-value">
+                    {{ resumen.preventivos }}
+                </div>
+
+                <div class="small text-muted mt-2">Total</div>
+
+                <div class="kpi-value">
+                    $ {{ resumen.costo_preventivas|default:0|floatformat:0|intcomma }}
+                </div>
+
+            </div>
+        </div>
+
+
+
+    <div class="col-md-3">
+            <div class="kpi-card text-center">
+
+                <div class="kpi-title">Correctivas</div>
+
+                <div class="kpi-value">
+                    {{ resumen.correctivos }}
+                </div>
+
+                <div class="small text-muted mt-2">Total</div>
+
+                <div class="kpi-value">
+                    $ {{ resumen.costo_correctivas|default:0|floatformat:0|intcomma }}
+                </div>
+
+            </div>
+        </div>
+
+
+        <div class="card mb-2">
+
+            <div class="card-header text-center">
+            Servicios
+            </div>
+
+            <table class="table table-sm table-bordered mt-2 mb-0">
+
+            <thead>
+
+            <tr>
+            <th>Técnico</th>
+            <th>Total</th>
+            <th>Prev</th>
+            <th>Corr</th>
+            <th>$</th>
+            </tr>
+
+            </thead>
+
+            <tbody>
+
+            {% for t in tabla_servicios %}
+
+            <tr>
+
+            <td>{{ t.tecnico }}</td>
+
+            <td>{{ t.total }}</td>
+
+            <td>{{ t.preventivas }}</td>
+
+            <td>{{ t.correctivas }}</td>
+
+            <td class="text-end">
+            $ {{ t.costo_total|floatformat:0|intcomma }}
+            </td>
+
+            </tr>
+
+            {% endfor %}
+
+            </tbody>
+
+            </table>
+
+            </div>
+
+            <div class="card mb-2">
+
+                <div class="card">
+
+                        <div class="card-header text-center">
+                        Técnicos
+                        </div>
+
+                        <table class="table table-sm table-bordered">
+
+                        <thead>
+
+                        <tr>
+                        <th>Técnico</th>
+                        <th>Total</th>
+                        <th>Prev</th>
+                        <th>Corr</th>
+                        <th>$</th>
+                        </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                        {% for t in tabla_tecnicos %}
+
+                        <tr>
+
+                        <td>{{ t.tecnico }}</td>
+
+                        <td>{{ t.total }}</td>
+
+                        <td>{{ t.preventivas }}</td>
+
+                        <td>{{ t.correctivas }}</td>
+
+                        <td class="text-end">
+                        $ {{ t.costo_total|floatformat:0|intcomma }}
+                        </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                        </tbody>
+
+                        </table>
+
+                        </div>
+
+            </div>
 </div>
 
 

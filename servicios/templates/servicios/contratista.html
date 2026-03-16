@@ -6,10 +6,12 @@
 
 <h2 class="mb-4 text-center">Servicios Técnicos por Contratista</h2>
 
-<a href="{% url 'contratista_pdf' %}?contratista_id={{ contratista_id }}&mes={{ mes }}&anio={{ anio }}&tipo_servicio={{ tipo_servicio }}&estado_pago={{ estado_pago }}" 
-   target="_blank" 
-   class="btn btn-danger mb-3">
-    📄 Exportar PDF
+<a href="{% url 'contratista_pdf' %}?contratista_id={{ contratista_id }}&mes={{ mes }}&anio={{ anio }}&estado_pago={{ estado_pago }}"
+target="_blank"
+class="btn btn-danger">
+
+Exportar PDF
+
 </a>
 
 <form method="get" class="row mb-4">
@@ -85,42 +87,55 @@
 <!-- CONTENEDOR SUPERIOR -->
 <div class="sticky-top-container p-3 mb-2 bg-light">
 
-    {% if contratista %}
-    <div class="row mb-3">
+  <div class="row mb-3">
 
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="kpi-title">Contratista</div>
-                <div class="kpi-value">{{ contratista.nombre }}</div>
+    <div class="col-md-3">
+        <div class="kpi-card text-center">
+
+            <div class="kpi-title">Contratista</div>
+
+            <div class="kpi-value">
+                {% if contratista %}
+                    {{ contratista.nombre }}
+                {% else %}
+                    Todos
+                {% endif %}
             </div>
-        </div>
 
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="kpi-title">Ubicación</div>
-                <div class="kpi-value">{{ contratista.ciudad }}</div>
+            <div class="small text-muted mt-2">Ubicación</div>
+
+            <div class="kpi-value">
+                {% if contratista %}
+                    {{ contratista.ciudad }}
+                {% else %}
+                    Todas
+                {% endif %}
             </div>
-        </div>
 
+        </div>
     </div>
-    {% endif %}
 
     {% if resumen %}
 
-    <div class="row g-3 mb-4">
+   
 
         <!-- TOTAL MANTENCIONES -->
-        <div class="col-md-3">
-            <div class="kpi-card text-center">
+       
+        <div class="col-md-2">
+            <div class="kpi-card text-center ">
                 <div class="kpi-title">Total Mantenciones</div>
-                <div class="kpi-value" id="total_mantenciones">
+                <div class="kpi-value">
                     {{ resumen.total_mantenciones }}
+                </div>
+                <div class="small text-muted mt-2">Monto</div>
+                <div class="kpi-value " id="monto_total">
+                    ${{ resumen.monto_total|default:0|floatformat:0|intcomma }}
                 </div>
             </div>
         </div>
 
         <!-- PREVENTIVAS -->
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="kpi-card text-center border-success">
                 <div class="kpi-title text-success">Preventivas</div>
                 <div class="kpi-value">
@@ -134,7 +149,7 @@
         </div>
 
         <!-- CORRECTIVAS -->
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="kpi-card text-center border-warning">
                 <div class="kpi-title text-warning">Correctivas</div>
                 <div class="kpi-value">
@@ -147,46 +162,52 @@
             </div>
         </div>
 
-        <!-- TOTAL -->
-        <div class="col-md-3">
-            <div class="kpi-card text-center">
-                <div class="kpi-title">Total a pagar $</div>
-                <div class="kpi-value" id="monto_total">
-                    ${{ resumen.monto_total|default:0|floatformat:0|intcomma }}
-                </div>
-            </div>
-        </div>
+        <!-- ESTADO PAGOS -->
+
+       <div class="col-md-3">
+
+            <table class="table table-sm table-bordered mt-2 mb-0">
+            <thead class="table-light">
+                <tr style="font-size:10px">
+                    <th>Estado</th>
+                    <th>Cant.</th>
+                    <th>Monto</th>
+                </tr>
+            </thead>
+
+            <tbody style="font-size:11px">
+
+                <tr>
+                    <td class="text-success">✔ Aprobado</td>
+                    <td id="cantidad_aprobado">{{ resumen.cantidad_aprobado }}</td>
+                    <td id="monto_aprobado">
+                        ${{ resumen.monto_aprobado|floatformat:0|intcomma }}
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="text-warning">⏳ Revisión</td>
+                    <td id="cantidad_revision">{{ resumen.cantidad_revision }}</td>
+                    <td id="monto_revision">
+                        ${{ resumen.monto_revision|floatformat:0|intcomma }}
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="text-danger">✖ Rechazado</td>
+                    <td id="cantidad_rechazado">{{ resumen.cantidad_rechazado }}</td>
+                    <td id="monto_rechazado">
+                        ${{ resumen.monto_rechazado|floatformat:0|intcomma }}
+                    </td>
+                </tr>
+
+            </tbody>
+        </table>
+
+       </div>
 
     </div>
 
-    <!-- ESTADO PAGOS -->
-    <div class="row mb-3">
-
-        <div class="col-md-4">
-            <div class="kpi-card border-success">
-                <div class="kpi-title text-success">✔ Aprobado</div>
-                <p>Cantidad: <strong id="cantidad_aprobado">{{ resumen.cantidad_aprobado }}</strong></p>
-                <p>Total: <strong id="monto_aprobado">${{ resumen.monto_aprobado|floatformat:0|intcomma }}</strong></p>
-            </div>
-        </div>
-
-        <div class="col-md-4">
-            <div class="kpi-card border-warning">
-                <div class="kpi-title text-warning">⏳ En Revisión</div>
-                <p>Cantidad: <strong id="cantidad_revision">{{ resumen.cantidad_revision }}</strong></p>
-                <p>Total: <strong id="monto_revision">${{ resumen.monto_revision|floatformat:0|intcomma }}</strong></p>
-            </div>
-        </div>
-
-        <div class="col-md-4">
-            <div class="kpi-card border-danger">
-                <div class="kpi-title text-danger">✖ Rechazado</div>
-                <p>Cantidad: <strong id="cantidad_rechazado">{{ resumen.cantidad_rechazado }}</strong></p>
-                <p>Total: <strong id="monto_rechazado">${{ resumen.monto_rechazado|floatformat:0|intcomma }}</strong></p>
-            </div>
-        </div>
-
-    </div>
 
     {% endif %}
 
@@ -194,7 +215,7 @@
 
 
 <!-- TABLA -->
-<div class="table-scrollable">
+<div class="table-responsive">
 
     <table class="table table-bordered table-hover">
 
