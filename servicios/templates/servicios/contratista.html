@@ -7,7 +7,7 @@
 <h2 class="mb-4 text-center">Servicios Técnicos por Contratista</h2>
 
 <div class="text-end">
-    <a href="{% url 'contratista_pdf' %}?contratista_id={{ contratista_id }}&mes={{ mes }}&anio={{ anio }}&estado_pago={{ estado_pago }}"
+    <a href="{% url 'contratista_pdf' %}?contratista_id={{ contratista.id }}&mes={{ mes }}&anio={{ anio }}&estado_pago={{ estado_pago }}"
        target="_blank"
        class="btn btn-danger">
         Exportar PDF
