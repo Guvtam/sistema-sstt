@@ -646,6 +646,40 @@ def contratista(request):
             Value(0)
         ),
 
+        # =========================
+        # 🔥 NUEVO: PREV / CORR POR ESTADO
+        # =========================
+
+        aprobado_preventivas=Count(
+            "id",
+            filter=Q(estado_pago="aprobado", tipo_servicio__icontains="PREVENTIV")
+        ),
+
+        aprobado_correctivas=Count(
+            "id",
+            filter=Q(estado_pago="aprobado", tipo_servicio__icontains="CORRECTIV")
+        ),
+
+        revision_preventivas=Count(
+            "id",
+            filter=Q(estado_pago="revision", tipo_servicio__icontains="PREVENTIV")
+        ),
+
+        revision_correctivas=Count(
+            "id",
+            filter=Q(estado_pago="revision", tipo_servicio__icontains="CORRECTIV")
+        ),
+
+        rechazado_preventivas=Count(
+            "id",
+            filter=Q(estado_pago="rechazado", tipo_servicio__icontains="PREVENTIV")
+        ),
+
+        rechazado_correctivas=Count(
+            "id",
+            filter=Q(estado_pago="rechazado", tipo_servicio__icontains="CORRECTIV")
+        ),
+
         monto_total=Coalesce(
             Sum("valor_pago_tecnico"),
             Value(0)
@@ -1008,5 +1042,29 @@ def contratista_pdf(request):
 
     response["Content-Disposition"] = \
         'inline; filename="reporte_contratista.pdf"'
+
+    return response
+
+
+
+
+
+def exportar_excel(request):
+
+    servicios = ServicioTecnico.objects.all().values()
+
+    df = pd.DataFrame(servicios)
+
+    # 🔥 SOLUCIÓN DEFINITIVA
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            df[col] = df[col].dt.tz_localize(None)
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename=servicios.xlsx'
+
+    df.to_excel(response, index=False)
 
     return response

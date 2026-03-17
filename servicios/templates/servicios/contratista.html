@@ -6,13 +6,14 @@
 
 <h2 class="mb-4 text-center">Servicios Técnicos por Contratista</h2>
 
-<a href="{% url 'contratista_pdf' %}?contratista_id={{ contratista_id }}&mes={{ mes }}&anio={{ anio }}&estado_pago={{ estado_pago }}"
-target="_blank"
-class="btn btn-danger">
-
-Exportar PDF
-
-</a>
+<div class="text-end">
+    <a href="{% url 'contratista_pdf' %}?contratista_id={{ contratista_id }}&mes={{ mes }}&anio={{ anio }}&estado_pago={{ estado_pago }}"
+       target="_blank"
+       class="btn btn-danger">
+        Exportar PDF
+    </a>
+</div>
+<br>
 
 <form method="get" class="row mb-4">
 
@@ -164,53 +165,62 @@ Exportar PDF
 
         <!-- ESTADO PAGOS -->
 
-       <div class="col-md-3">
+       <!-- ESTADO PAGOS -->
 
-            <table class="table table-sm table-bordered mt-2 mb-0">
-            <thead class="table-light">
-                <tr style="font-size:10px">
-                    <th>Estado</th>
-                    <th>Cant.</th>
-                    <th>Monto</th>
-                </tr>
-            </thead>
+<div class="col-md-3">
 
-            <tbody style="font-size:11px">
+    <table class="table table-sm table-bordered mt-2 mb-0 text-center">
+        <thead class="table-light">
+            <tr style="font-size:10px">
+                <th>Estado</th>
+                <th>Cant.</th>
+                
+                <th>Prev</th>
+                <th>Corr</th>
+                <th>Monto</th>
+            </tr>
+        </thead>
 
-                <tr>
-                    <td class="text-success">✔ Aprobado</td>
-                    <td id="cantidad_aprobado">{{ resumen.cantidad_aprobado }}</td>
-                    <td id="monto_aprobado">
-                        ${{ resumen.monto_aprobado|floatformat:0|intcomma }}
-                    </td>
-                </tr>
+        <tbody style="font-size:11px">
 
-                <tr>
-                    <td class="text-warning">⏳ Revisión</td>
-                    <td id="cantidad_revision">{{ resumen.cantidad_revision }}</td>
-                    <td id="monto_revision">
-                        ${{ resumen.monto_revision|floatformat:0|intcomma }}
-                    </td>
-                </tr>
+            <tr>
+                <td class="text-success fw-bold">✔ Aprobado</td>
+                <td id="cantidad_aprobado">{{ resumen.cantidad_aprobado }}</td>
+                
+                <td>{{ resumen.aprobado_preventivas }}</td>
+                <td>{{ resumen.aprobado_correctivas }}</td>
+                <td class="text-end" id="monto_aprobado">
+                    $ {{ resumen.monto_aprobado|floatformat:0|intcomma }}
+                </td>
+            </tr>
 
-                <tr>
-                    <td class="text-danger">✖ Rechazado</td>
-                    <td id="cantidad_rechazado">{{ resumen.cantidad_rechazado }}</td>
-                    <td id="monto_rechazado">
-                        ${{ resumen.monto_rechazado|floatformat:0|intcomma }}
-                    </td>
-                </tr>
+            <tr>
+                <td class="text-warning fw-bold">⏳ Revisión</td>
+                <td id="cantidad_revision">{{ resumen.cantidad_revision }}</td>
+                
+                <td>{{ resumen.revision_preventivas }}</td>
+                <td>{{ resumen.revision_correctivas }}</td>
+                <td class="text-end" id="monto_revision">
+                    $ {{ resumen.monto_revision|floatformat:0|intcomma }}
+                </td>
+            </tr>
 
-            </tbody>
-        </table>
+            <tr>
+                <td class="text-danger fw-bold">✖ Rechazado</td>
+                <td id="cantidad_rechazado">{{ resumen.cantidad_rechazado }}</td>
+                
+                <td>{{ resumen.rechazado_preventivas }}</td>
+                <td>{{ resumen.rechazado_correctivas }}</td>
+                <td class="text-end" id="monto_rechazado">
+                    $ {{ resumen.monto_rechazado|floatformat:0|intcomma }}
+                </td>
+            </tr>
 
-       </div>
+        </tbody>
+    </table>
 
-    </div>
-
-
-    {% endif %}
-
+{% endif %}
+</div>
 </div>
 
 
