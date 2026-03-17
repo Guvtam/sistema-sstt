@@ -17,7 +17,6 @@ from io import BytesIO
 
 
 
-
 # ==============================
 # FUNCIONES AUXILIARES
 # ==============================
@@ -236,6 +235,8 @@ def internos(request):
         else:
             tabla_tecnicos.append(tecnico)
 
+    
+
     # ==============================
     # RENDER
     # ==============================
@@ -256,6 +257,8 @@ def internos(request):
 
         "mes": mes,
         "anio": anio,
+
+        
     })
 
 

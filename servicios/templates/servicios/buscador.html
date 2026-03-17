@@ -80,57 +80,78 @@ value="{{ query|default:'' }}"
 
 <hr>
 
-    <table border="1" cellpadding="5">
-        <tr>
-            <th>Número</th>
-            <th>Fecha Finalización</th>
-            <th>Nombre Cuenta</th>
-            <th>Provincia - Estado</th>
-            <th>Tipo Servicio</th>
-            <th>Servicio</th>
-            <th>Observaciones</th>
-            <th>Técnico</th>
-          
-            <th>Valor a pagar</th>
-          
-            <th>Cuenta Contable</th>
-            <th>Incidencias</th>
-        </tr>
+    <!-- TABLA -->
+<div class="table-responsive">
 
-        {% for servicio in servicios %}
-        <tr>
-            <td>{{ servicio.numero }}</td>
-            <td>{{ servicio.fecha_finalizacion|date:"d/m/Y H:i" }}</td>
-            <td>{{ servicio.cuenta }}</td>
-            <td>{{ servicio.provincia_estado }}</td>
-            <td>{{ servicio.tipo_servicio }}</td>
-            <td>{{ servicio.servicio }}</td>
-            <td>{{ servicio.observaciones }}</td>
-            <td>{{ servicio.tecnico }}</td>
-           
-            <td>$ {{ servicio.valor_pago_tecnico|default:0|floatformat:0|intcomma }}</td>
-           
-            <td>{{ servicio.cuenta_contable }}</td>
-            <td>
+    <table class="table table-bordered table-hover">
 
-                {% if servicio.numero_incidencias_dia > 2 %}
-                <span class="badge bg-danger">{{ servicio.numero_incidencias_dia }}</span>
+        <thead class="table-dark sticky-table-header">
+            <tr>
+                <th>Número</th>
+                <th>Fecha Finalización</th>
+                <th>Nombre Cuenta</th>
+                <th>Provincia - Estado</th>
+                <th>Tipo Servicio</th>
+                <th>Servicio</th>
+                <th class="col-observaciones">Observaciones</th>
+                <th>Técnico</th>
+                <th>Valor a pagar</th>
+                <th>Cuenta Contable</th>
+                <th>Incidencias</th>
+            </tr>
+        </thead>
 
-                {% elif servicio.numero_incidencias_dia == 2 %}
-                <span class="badge bg-warning text-dark">{{ servicio.numero_incidencias_dia }}</span>
+        <tbody>
 
-                {% else %}
-                <span class="badge bg-success">{{ servicio.numero_incidencias_dia }}</span>
-                {% endif %}
+            {% for servicio in servicios %}
+            <tr>
 
+                <td>{{ servicio.numero }}</td>
+
+                <td>{{ servicio.fecha_finalizacion|date:"d/m/Y H:i" }}</td>
+
+                <td>{{ servicio.cuenta }}</td>
+
+                <td>{{ servicio.provincia_estado }}</td>
+
+                <td>{{ servicio.tipo_servicio }}</td>
+
+                <td>{{ servicio.servicio }}</td>
+
+                <td class="col-observaciones">
+                    {{ servicio.observaciones }}
                 </td>
-        </tr>
-        {% empty %}
-        <tr>
-            <td colspan="5">No hay resultados</td>
-        </tr>
-        {% endfor %}
+
+                <td>{{ servicio.tecnico }}</td>
+
+                <td>
+                    $ {{ servicio.valor_pago_tecnico|default:0|floatformat:0|intcomma }}
+                </td>
+
+                <td>{{ servicio.cuenta_contable }}</td>
+
+                <td>
+                    {% if servicio.numero_incidencias_dia > 2 %}
+                        <span class="badge bg-danger">{{ servicio.numero_incidencias_dia }}</span>
+                    {% elif servicio.numero_incidencias_dia == 2 %}
+                        <span class="badge bg-warning text-dark">{{ servicio.numero_incidencias_dia }}</span>
+                    {% else %}
+                        <span class="badge bg-success">{{ servicio.numero_incidencias_dia }}</span>
+                    {% endif %}
+                </td>
+
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="11" class="text-center">No hay resultados</td>
+            </tr>
+            {% endfor %}
+
+        </tbody>
+
     </table>
+
+</div>
 
     <button onclick="subirArriba()" id="btnSubir" title="Subir arriba">
     ↑
