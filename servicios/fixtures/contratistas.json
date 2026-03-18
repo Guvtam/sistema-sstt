@@ -56,4 +56,8 @@
 {"model":"servicios.contratista","pk":28,"fields":{"nombre":"Defcon","nombre_empresa":"VISUALIZACION Y SEGURIDAD GLOBAL SPA","rut":"78.080.103-4","fono":"977917236","correo":"JCROMERO@VSG.CL","ciudad":"Santiago","banco":"Santander","tipo_cuenta":"Cuenta Corriente","numero_cuenta":"97194157","categoria":"","fecha_creacion": "2026-01-01T00:00:00Z"}},
 
 {"model":"servicios.contratista","pk":29,"fields":{"nombre":"Patricio Gonzalez","nombre_empresa":"Acces Technology SPA","rut":"77.262.298-8","fono":"56991992833","correo":"contacto@accesstechnology.cl","ciudad":"Santiago","banco":"Estado","tipo_cuenta":"Vista","numero_cuenta":"902-7-038986-3","categoria":"Factura","fecha_creacion": "2026-01-01T00:00:00Z"}}
+
+
+
+
 ]

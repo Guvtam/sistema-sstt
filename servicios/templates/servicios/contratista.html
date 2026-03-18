@@ -17,7 +17,7 @@
 
 <form method="get" class="row mb-4">
 
-    <div class="col-md-2">
+    <div class="col-md-1">
         <select name="mes" class="form-select" onchange="this.form.submit()">
             <option value="">Todos los meses</option>
             <option value="1" {% if mes == "1" %}selected{% endif %}>Enero</option>
@@ -35,7 +35,7 @@
         </select>
     </div>
 
-    <div class="col-md-2">
+    <div class="col-md-1">
         <select name="anio" class="form-select" onchange="this.form.submit()">
             <option value="">Todos los años</option>
             <option value="2024" {% if anio == "2024" %}selected{% endif %}>2024</option>
@@ -45,7 +45,7 @@
         </select>
     </div>
 
-    <div class="col-md-3">
+    <div class="col-md-2">
         <select name="contratista_id" class="form-select" onchange="this.form.submit()">
             <option value="">Seleccione contratista</option>
             {% for c in contratistas %}
@@ -68,9 +68,24 @@
         </select>
     </div>
 
-    <div class="col-md-3">
+    <div class="col-md-2">
+        
+        <select name="provincia_estado" class="form-select" onchange="this.form.submit()">
+
+            <option value="">Todas las provincias</option>
+
+            {% for p in provincia %}
+                <option value="{{ p }}" {% if p == provincia_estado_sel %}selected{% endif %}>
+                    {{ p }}
+                </option>
+            {% endfor %}
+
+        </select>
+    </div>
+
+    <div class="col-md-2">
         <select name="estado_pago" class="form-select" onchange="this.form.submit()">
-            <option value="">Todos los estados</option>
+            <option value="">Todos estados de pago</option>
             <option value="aprobado" {% if estado_pago == "aprobado" %}selected{% endif %}>
                 Aprobados
             </option>
@@ -83,14 +98,94 @@
         </select>
     </div>
 
+    <div class="col-md-2">
+        
+        <!-- Botón Limpiar filtros -->
+        <a href="{% url 'contratista' %}" class="btn btn-warning">
+            Limpiar
+        </a>
+    </div>
+
+    
+
 </form>
+
+<div class="sticky-top-container p-3 mb-2 bg-light">
+
+  <div class="row mb-3">
+
+    <div class="row g-3">
+    <!-- Columna izquierda: Contratista y Total -->
+    <div class="col-md-4 d-flex flex-column">
+        <!-- Tarjeta Contratista -->
+        <div class="kpi-card mb-3 h-50 text-center">
+            <div class="kpi-title">Contratista</div>
+            <div class="kpi-value">Carlos Navarro</div>
+            <div class="small text-muted">Ubicación: Parral</div>
+        </div>
+
+        <!-- Tarjeta Total Mantenciones -->
+        <div class="kpi-card h-50 text-center">
+            <div class="kpi-title">Total Mantenciones</div>
+            <div class="kpi-value">17</div>
+            <div class="small text-muted mt-1">Monto</div>
+            <div class="kpi-value">
+                $7,641,500
+            </div>
+        </div>
+    </div>
+
+    <!-- Columna derecha: Preventivas / Correctivas arriba, B2B / B2C abajo -->
+    <div class="col-md-8">
+        <div class="row g-3">
+            <!-- Fila superior: Preventivas / Correctivas -->
+                <div class="col-md-6">
+                    <div class="kpi-card text-center border-success">
+                        <div class="kpi-title text-success">Preventivas</div>
+                        <div class="kpi-value text-success">2</div>
+                        <div class="small text-muted mt-1">Monto</div>
+                        <div class="kpi-value text-success">$640,000</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="kpi-card text-center border-warning">
+                        <div class="kpi-title text-warning">Correctivas</div>
+                        <div class="kpi-value text-warning">15</div>
+                        <div class="small text-muted mt-1">Monto</div>
+                        <div class="kpi-value text-warning">$7,001,500</div>
+                    </div>
+                </div>
+
+                <!-- Fila inferior: B2B / B2C -->
+                <div class="col-md-6">
+                    <div class="kpi-card text-center border-info">
+                        <div class="kpi-title text-info">B2B</div>
+                        <div class="kpi-value text-info">16</div>
+                        <div class="small text-muted mt-1">Monto</div>
+                        <div class="kpi-value text-info">$7,101,500</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="kpi-card text-center border-secondary">
+                        <div class="kpi-title text-secondary">B2C</div>
+                        <div class="kpi-value text-secondary">1</div>
+                        <div class="small text-muted mt-1">Monto</div>
+                        <div class="kpi-value text-secondary">$540,000</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+  </div>
+</div>
 
 <!-- CONTENEDOR SUPERIOR -->
 <div class="sticky-top-container p-3 mb-2 bg-light">
 
   <div class="row mb-3">
 
-    <div class="col-md-3">
+    <div class="col-md-2">
         <div class="kpi-card text-center">
 
             <div class="kpi-title">Contratista</div>
@@ -163,6 +258,10 @@
             </div>
         </div>
 
+        
+
+        
+
         <!-- ESTADO PAGOS -->
 
        <!-- ESTADO PAGOS -->
@@ -222,7 +321,35 @@
 {% endif %}
 </div>
 </div>
+<!-- Nueva fila para B2B y B2C -->
+<!-- Fila para B2B y B2C -->
+<div class="row mt-3 justify-content-start">
+    <!-- Tarjeta B2B -->
+    <div class="col-md-2 mb-2">
+        <div class="kpi-card text-center border-info h-100">
+            <div class="kpi-title text-info">B2B</div>
+            <div class="kpi-value text-info">{{ resumen.total_b2b }}</div>
+            <div class="small text-muted mt-1">Monto</div>
+            <div class="kpi-value text-info" id="total_b2b">
+                ${{ resumen.monto_b2b|default:0|floatformat:0|intcomma }}
+            </div>
+        </div>
+    </div>
 
+    <!-- Tarjeta B2C -->
+    <div class="col-md-2 mb-2">
+        <div class="kpi-card text-center border-secondary h-100">
+            <div class="kpi-title text-secondary">B2C</div>
+            <div class="kpi-value text-secondary">{{ resumen.total_b2c }}</div>
+            <div class="small text-muted mt-1">Monto</div>
+            <div class="kpi-value text-secondary" id="total_b2c">
+                ${{ resumen.monto_b2c|default:0|floatformat:0|intcomma }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<br>
 
 <!-- TABLA -->
 <div class="table-responsive">
@@ -234,11 +361,14 @@
                 <th>Número</th>
                 <th>Fecha Finalización</th>
                 <th>Cuenta First</th>
-                
+                <th>Nombre Cuenta</th>
+                <th>Ceco</th>
                 <th>Provincia - Estado</th>
                 <th>Tipo Servicio</th>
                 <th>Servicio</th>
+                <th>Técnico</th>
                 <th class="col-observaciones">Observaciones</th>
+                <th>Clasificación</th>
                 <th>Valor Pago Técnico</th>
                 <th>Incidencias</th>
                 <th>Estado Pago</th>
@@ -263,6 +393,11 @@
                         {{ s.cuenta_contable }}
                     </span>
                 </td>
+                <td>{{ s.cuenta }}</td>
+
+                <td>
+                    {{ s.ceco }}
+                </td>
 
                 <td>{{ s.provincia_estado }}</td>
 
@@ -270,7 +405,17 @@
 
                 <td>{{ s.servicio }}</td>
 
+                <td>{{ s.tecnico }}</td>
+
                 <td class="col-observaciones">{{ s.observaciones }}</td>
+
+                <td>
+                    {% if s.clasificacion == "B2B" %}
+                        <span class="badge bg-primary">B2B</span>
+                    {% else %}
+                        <span class="badge bg-secondary">B2C</span>
+                    {% endif %}
+                </td>
 
                 <td>
                     <span class="monto-texto" id="texto-{{ s.id }}">

@@ -71,6 +71,13 @@ class ServicioTecnico(models.Model):
     costo_mano_obra = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     fecha_pago = models.DateTimeField(null=True, blank=True)
 
+    @property
+    def clasificacion(self):
+        from .models import CuentaB2B
+        if self.cuenta_contable and CuentaB2B.objects.filter(cuenta=self.cuenta_contable).exists():
+            return "B2B"
+        return "B2C"
+
     # MONTO ORIGINAL DEL EXCEL (NO SE MODIFICA)
     valor_pago_original = models.IntegerField(null=True, blank=True)
 
@@ -96,3 +103,29 @@ class ServicioTecnico(models.Model):
     def __str__(self):
         cuenta = self.cuenta_contable if self.cuenta_contable else "Sin cuenta"
         return f"{self.numero} - {cuenta}"
+
+
+
+class CuentaB2B(models.Model):
+    cuenta = models.CharField(max_length=50)
+    nombre = models.CharField(max_length=255, null=True, blank=True)
+    kam = models.CharField(max_length=150, null=True, blank=True)
+
+    
+
+    def __str__(self):
+        return f"{self.cuenta} - {self.nombre}"
+    
+
+
+class CECO(models.Model):
+    cuenta = models.CharField(max_length=50)
+    ceco = models.CharField(max_length=50)
+    nombre = models.CharField(max_length=255)
+    estado = models.CharField(max_length=20, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.cuenta} - {self.ceco} - {self.nombre}"
+
+    class Meta:
+        unique_together = ("cuenta", "ceco")  # 🔥 CLAVE REAL

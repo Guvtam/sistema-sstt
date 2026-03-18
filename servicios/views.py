@@ -7,13 +7,14 @@ from django.db.models.functions import Coalesce
 from decimal import Decimal
 from datetime import datetime
 import re
-from .models import ServicioTecnico, CargaMensual, Contratista
+from .models import ServicioTecnico, CargaMensual, Contratista,CECO
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.template.loader import render_to_string
 from django.http import HttpResponse
 from xhtml2pdf import pisa
 from io import BytesIO
+from django.db.models.functions import Trim, Upper
 
 
 
@@ -510,11 +511,9 @@ def buscador_servicios(request):
 
 
 
-def contratista(request):
 
-    # ==============================
-    # DATOS BASE
-    # ==============================
+
+def contratista(request):
 
     cargas = CargaMensual.objects.all().order_by("-fecha_carga")
 
@@ -524,185 +523,286 @@ def contratista(request):
     contratista_id = request.GET.get("contratista_id")
     estado_pago = request.GET.get("estado_pago")
     tipo_servicio = request.GET.get("tipo_servicio")
+    provincia_estado_sel = request.GET.get("provincia_estado")
 
     # ==============================
-    # SI NO VIENE MES/AÑO → USAR ÚLTIMA CARGA
+    # DEFAULT MES/AÑO
     # ==============================
-
     if not mes or not anio:
         ultima_carga = CargaMensual.objects.order_by("-anio", "-mes").first()
-
         if ultima_carga:
             mes = str(ultima_carga.mes)
             anio = str(ultima_carga.anio)
 
     # ==============================
-    # LISTA CONTRATISTAS
+    # CONTRATISTAS
     # ==============================
-
     contratistas = Contratista.objects.filter(
         servicios__isnull=False
     ).distinct().order_by("nombre")
 
-    # contratista seleccionado
     contratista_obj = None
     if contratista_id:
         contratista_obj = Contratista.objects.filter(id=contratista_id).first()
 
     # ==============================
-    # QUERY SERVICIOS
+    # QUERY BASE
     # ==============================
-
-    servicios = ServicioTecnico.objects.filter(
+    servicios_qs = ServicioTecnico.objects.filter(
         contratista__isnull=False
     )
 
-    # filtro por mes/año
     if mes and anio:
-        servicios = servicios.filter(
+        servicios_qs = servicios_qs.filter(
             carga__mes=mes,
             carga__anio=anio
         )
-
-    # filtro por carga específica
     elif carga_id:
-        servicios = servicios.filter(carga_id=carga_id)
+        servicios_qs = servicios_qs.filter(carga_id=carga_id)
 
-    # filtro contratista
     if contratista_id:
-        servicios = servicios.filter(contratista_id=contratista_id)
+        servicios_qs = servicios_qs.filter(contratista_id=contratista_id)
 
-    # filtro estado pago
     if estado_pago:
-        servicios = servicios.filter(estado_pago=estado_pago)
+        servicios_qs = servicios_qs.filter(estado_pago=estado_pago)
 
-    # filtro tipo servicio
     if tipo_servicio:
-        servicios = servicios.filter(
+        servicios_qs = servicios_qs.filter(
             tipo_servicio__icontains=tipo_servicio
         )
 
-    servicios = servicios.order_by("fecha_finalizacion")
+    servicios_qs = servicios_qs.order_by("fecha_finalizacion")
 
     # ==============================
-    # RESUMEN KPIs
+    # 🔥 FILTRO ROBUSTO (INCLUYE NAN)
+    # ==============================
+    servicios = list(servicios_qs)
+
+    if provincia_estado_sel:
+
+        valor = provincia_estado_sel.strip().upper()
+
+        servicios_filtrados = []
+
+        for s in servicios:
+            dato = str(s.provincia_estado).strip().upper() if s.provincia_estado else ""
+
+            # 👉 caso NAN (texto)
+            if valor == "NAN":
+                if dato == "NAN" or dato == "":
+                    servicios_filtrados.append(s)
+
+            # 👉 caso normal
+            else:
+                if dato == valor:
+                    servicios_filtrados.append(s)
+
+        servicios = servicios_filtrados
+
+    # ==============================
+    # 🔥 SELECT (INCLUYE NAN)
+    # ==============================
+    provincias_set = set()
+
+    for s in servicios_qs:
+        dato = str(s.provincia_estado).strip().upper() if s.provincia_estado else "NAN"
+
+        if not dato:
+            dato = "NAN"
+
+        provincias_set.add(dato)
+
+    provincias = sorted(provincias_set)
+
+    # =========================
+    # CECO
+    # =========================
+    def normalizar(valor):
+        if not valor:
+            return ""
+        return str(valor).strip().upper()
+
+    ceco_dict = {
+        normalizar(c.cuenta): c.ceco
+        for c in CECO.objects.all()
+    }
+
+    for s in servicios:
+        cuenta = normalizar(s.cuenta_contable)
+        s.ceco = ceco_dict.get(cuenta, "-")
+
+    # ==============================
+    # RESUMEN
     # ==============================
 
-    resumen = servicios.aggregate(
+    # ==============================
+    # RESUMEN (LISTA FILTRADA)
+    # ==============================
 
-        total_mantenciones=Count("id"),
+    total_mantenciones = len(servicios)
 
-        total_preventivas=Count(
-            "id",
-            filter=Q(tipo_servicio__icontains="PREVENTIV")
-        ),
-
-        total_correctivas=Count(
-            "id",
-            filter=Q(tipo_servicio__icontains="CORRECTIV")
-        ),
-
-        cantidad_aprobado=Count("id", filter=Q(estado_pago="aprobado")),
-        cantidad_revision=Count("id", filter=Q(estado_pago="revision")),
-        cantidad_rechazado=Count("id", filter=Q(estado_pago="rechazado")),
-
-        monto_preventivas=Coalesce(
-            Sum(
-                "valor_pago_tecnico",
-                filter=Q(tipo_servicio__icontains="PREVENTIV")
-            ),
-            Value(0)
-        ),
-
-        monto_correctivas=Coalesce(
-            Sum(
-                "valor_pago_tecnico",
-                filter=Q(tipo_servicio__icontains="CORRECTIV")
-            ),
-            Value(0)
-        ),
-
-        monto_aprobado=Coalesce(
-            Sum(
-                "valor_pago_tecnico",
-                filter=Q(estado_pago="aprobado")
-            ),
-            Value(0)
-        ),
-
-        monto_revision=Coalesce(
-            Sum(
-                "valor_pago_tecnico",
-                filter=Q(estado_pago="revision")
-            ),
-            Value(0)
-        ),
-
-        monto_rechazado=Coalesce(
-            Sum(
-                "valor_pago_tecnico",
-                filter=Q(estado_pago="rechazado")
-            ),
-            Value(0)
-        ),
-
-        # =========================
-        # 🔥 NUEVO: PREV / CORR POR ESTADO
-        # =========================
-
-        aprobado_preventivas=Count(
-            "id",
-            filter=Q(estado_pago="aprobado", tipo_servicio__icontains="PREVENTIV")
-        ),
-
-        aprobado_correctivas=Count(
-            "id",
-            filter=Q(estado_pago="aprobado", tipo_servicio__icontains="CORRECTIV")
-        ),
-
-        revision_preventivas=Count(
-            "id",
-            filter=Q(estado_pago="revision", tipo_servicio__icontains="PREVENTIV")
-        ),
-
-        revision_correctivas=Count(
-            "id",
-            filter=Q(estado_pago="revision", tipo_servicio__icontains="CORRECTIV")
-        ),
-
-        rechazado_preventivas=Count(
-            "id",
-            filter=Q(estado_pago="rechazado", tipo_servicio__icontains="PREVENTIV")
-        ),
-
-        rechazado_correctivas=Count(
-            "id",
-            filter=Q(estado_pago="rechazado", tipo_servicio__icontains="CORRECTIV")
-        ),
-
-        monto_total=Coalesce(
-            Sum("valor_pago_tecnico"),
-            Value(0)
-        )
+    total_preventivas = sum(
+        1 for s in servicios
+        if s.tipo_servicio and "PREVENTIV" in s.tipo_servicio.upper()
     )
 
-    # ==============================
-    # RENDER
-    # ==============================
+    total_correctivas = sum(
+        1 for s in servicios
+        if s.tipo_servicio and "CORRECTIV" in s.tipo_servicio.upper()
+    )
+
+    cantidad_aprobado = sum(
+        1 for s in servicios if s.estado_pago == "aprobado"
+    )
+
+    cantidad_revision = sum(
+        1 for s in servicios if s.estado_pago == "revision"
+    )
+
+    cantidad_rechazado = sum(
+        1 for s in servicios if s.estado_pago == "rechazado"
+    )
+
+    monto_total = sum(s.valor_pago_tecnico or 0 for s in servicios)
+
+    monto_aprobado = sum(
+        (s.valor_pago_tecnico or 0)
+        for s in servicios if s.estado_pago == "aprobado"
+    )
+
+    monto_revision = sum(
+        (s.valor_pago_tecnico or 0)
+        for s in servicios if s.estado_pago == "revision"
+    )
+
+    monto_rechazado = sum(
+        (s.valor_pago_tecnico or 0)
+        for s in servicios if s.estado_pago == "rechazado"
+    )
+
+    # Montos por tipo de servicio
+    monto_preventivas = sum(
+        s.valor_pago_tecnico or 0
+        for s in servicios
+        if s.tipo_servicio and "PREVENTIV" in s.tipo_servicio.upper()
+    )
+
+    monto_correctivas = sum(
+        s.valor_pago_tecnico or 0
+        for s in servicios
+        if s.tipo_servicio and "CORRECTIV" in s.tipo_servicio.upper()
+    )
+    # PREV / CORR POR ESTADO
+
+    aprobado_preventivas = sum(
+        1 for s in servicios
+        if s.estado_pago == "aprobado"
+        and s.tipo_servicio
+        and "PREVENTIV" in s.tipo_servicio.upper()
+    )
+
+    aprobado_correctivas = sum(
+        1 for s in servicios
+        if s.estado_pago == "aprobado"
+        and s.tipo_servicio
+        and "CORRECTIV" in s.tipo_servicio.upper()
+    )
+
+    revision_preventivas = sum(
+        1 for s in servicios
+        if s.estado_pago == "revision"
+        and s.tipo_servicio
+        and "PREVENTIV" in s.tipo_servicio.upper()
+    )
+
+    revision_correctivas = sum(
+        1 for s in servicios
+        if s.estado_pago == "revision"
+        and s.tipo_servicio
+        and "CORRECTIV" in s.tipo_servicio.upper()
+    )
+
+    rechazado_preventivas = sum(
+        1 for s in servicios
+        if s.estado_pago == "rechazado"
+        and s.tipo_servicio
+        and "PREVENTIV" in s.tipo_servicio.upper()
+    )
+
+    rechazado_correctivas = sum(
+        1 for s in servicios
+        if s.estado_pago == "rechazado"
+        and s.tipo_servicio
+        and "CORRECTIV" in s.tipo_servicio.upper()
+    )
+
+
+
+    # Montos por clasificación
+    total_b2b = sum(1 for s in servicios if s.clasificacion == "B2B")
+    total_b2c = sum(1 for s in servicios if s.clasificacion == "B2C")
+
+    monto_b2b = sum(s.valor_pago_tecnico or 0 for s in servicios if s.clasificacion == "B2B")
+    monto_b2c = sum(s.valor_pago_tecnico or 0 for s in servicios if s.clasificacion == "B2C")
+
+    total_mantenciones = len(servicios)
+    monto_total = sum(
+        s.valor_pago_tecnico or 0 for s in servicios
+    )
+
+    resumen = {
+        
+        
+    
+        "total_mantenciones": total_mantenciones,
+        "total_preventivas": total_preventivas,
+        "total_correctivas": total_correctivas,
+
+        "cantidad_aprobado": cantidad_aprobado,
+        "cantidad_revision": cantidad_revision,
+        "cantidad_rechazado": cantidad_rechazado,
+
+        "monto_total": monto_total,
+        "monto_aprobado": monto_aprobado,
+        "monto_revision": monto_revision,
+        "monto_rechazado": monto_rechazado,
+
+        "monto_preventivas": monto_preventivas,
+        "monto_correctivas": monto_correctivas,
+
+
+        "aprobado_preventivas": aprobado_preventivas,
+        "aprobado_correctivas": aprobado_correctivas,
+
+        "revision_preventivas": revision_preventivas,
+        "revision_correctivas": revision_correctivas,
+
+        "rechazado_preventivas": rechazado_preventivas,
+        "rechazado_correctivas": rechazado_correctivas,
+
+        "total_b2b": total_b2b,
+        "total_b2c": total_b2c,
+        "monto_b2b": monto_b2b,
+        "monto_b2c": monto_b2c,
+    }
 
     return render(request, "servicios/contratista.html", {
-        "servicios": servicios,
-        "resumen": resumen,
         "cargas": cargas,
         "contratistas": contratistas,
+        "servicios": servicios,
         "contratista": contratista_obj,
-        "estado_pago": estado_pago,
-        "contratista_id": contratista_id,
-        "carga_id": carga_id,
-        "tipo_servicio": tipo_servicio,
+        "resumen": resumen,
         "mes": mes,
         "anio": anio,
+        "carga_id": carga_id,
+        "contratista_id": contratista_id,
+        "estado_pago": estado_pago,
+        "tipo_servicio": tipo_servicio,
+        "provincia_estado_sel": provincia_estado_sel,
+        "provincia": provincias,
     })
+
+
 
 # ==============================
 # CAMBIAR ESTADO PAGO
@@ -870,7 +970,11 @@ def editar_monto_tecnico(request, servicio_id):
 
 
 
-
+def obtener_ceco(servicio):
+    return CECO.objects.filter(
+        cuenta=servicio.cuenta_contable,
+        ceco=servicio.ceco_codigo
+    ).first()
 
 
 
