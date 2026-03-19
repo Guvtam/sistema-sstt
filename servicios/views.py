@@ -15,6 +15,7 @@ from django.http import HttpResponse
 from xhtml2pdf import pisa
 from io import BytesIO
 from django.db.models.functions import Trim, Upper
+from django.utils import timezone
 
 
 
@@ -27,8 +28,16 @@ def convertir_fecha(valor):
         return None
     try:
         if isinstance(valor, datetime):
-            return valor
-        return datetime.strptime(str(valor), "%d/%m/%Y %H:%M:%S")
+            fecha = valor
+        else:
+            fecha = datetime.strptime(str(valor), "%d/%m/%Y %H:%M:%S")
+
+        # 🔥 convertir a timezone-aware
+        if timezone.is_naive(fecha):
+            fecha = timezone.make_aware(fecha)
+
+        return fecha
+
     except:
         return None
 
@@ -266,10 +275,39 @@ def internos(request):
 # ==============================
 # SUBIR ARCHIVO
 # ==============================
-
 def subir_excel(request):
 
     mensaje = ""
+
+    # ======================
+    # 🔥 NORMALIZADOR GLOBAL
+    # ======================
+    def normalizar_nombre(nombre):
+        if not nombre:
+            return ""
+
+        nombre = nombre.upper().strip()
+
+        nombre = nombre.replace(".", "")
+
+        nombre = re.sub(r'\bEIRL\b', '', nombre)
+        nombre = re.sub(r'\bSPA\b', '', nombre)
+        nombre = re.sub(r'\bLTDA\b', '', nombre)
+
+        nombre = re.sub(r'^T\s*EXTERNO\s*', '', nombre)
+
+        nombre = re.sub(r'[^A-Z0-9 ]', '', nombre)
+
+        nombre = re.sub(r'\s+', ' ', nombre)
+
+        return nombre.strip()
+
+    # ======================
+    # 🔥 ALIAS (OPCIONAL)
+    # ======================
+    ALIAS = {
+        "ROBERTO BARRERA N": "ROBERTO BARRERA",
+    }
 
     if request.method == "POST":
 
@@ -288,7 +326,7 @@ def subir_excel(request):
                 nombre=nombre_carga,
                 mes=mes,
                 anio=anio,
-                )
+            )
 
             dataframes = []
 
@@ -302,9 +340,20 @@ def subir_excel(request):
             df.columns = df.columns.str.strip()
 
             # ======================
+            # 🔥 DICCIONARIO CONTRATISTAS
+            # ======================
+            contratistas_db = {}
+
+            for c in Contratista.objects.all():
+                key1 = normalizar_nombre(c.nombre)
+                contratistas_db[key1] = c
+
+                key2 = normalizar_nombre(c.nombre_empresa)
+                contratistas_db[key2] = c
+
+            # ======================
             # LIMPIAR VALOR
             # ======================
-
             if "Valor pago técnico" in df.columns:
 
                 df["Valor pago técnico"] = (
@@ -321,7 +370,6 @@ def subir_excel(request):
             # ======================
             # CUENTA CONTABLE
             # ======================
-
             if "Cuenta" in df.columns:
 
                 df["cuenta_contable"] = (
@@ -334,7 +382,6 @@ def subir_excel(request):
             # ======================
             # FECHA VISITA
             # ======================
-
             df["fecha_visita_convertida"] = pd.to_datetime(
                 df.get("Fecha de la visita"),
                 errors="coerce",
@@ -346,7 +393,6 @@ def subir_excel(request):
             # ======================
             # INCIDENCIAS POR DIA
             # ======================
-
             df["numero_incidencias_dia"] = (
                 df.groupby(
                     ["cuenta_contable", "fecha_visita_solo_dia"]
@@ -359,7 +405,6 @@ def subir_excel(request):
             # ======================
             # GUARDAR
             # ======================
-
             for _, row in df.iterrows():
 
                 nombre_tecnico_original = row.get("Tecnico")
@@ -372,14 +417,27 @@ def subir_excel(request):
 
                     nombre_tecnico = limpiar_nombre_tecnico(nombre_tecnico_original)
 
-                    if nombre_tecnico_original.upper().startswith("T. EXTERNO") or nombre_tecnico_original.upper() == "NEXTTECH":
+                    if (
+                        nombre_tecnico_original.upper().startswith("T. EXTERNO")
+                        or nombre_tecnico_original.upper() == "NEXTTECH"
+                    ):
 
                         nombre_limpio = limpiar_nombre_tecnico(nombre_tecnico_original)
 
                         if nombre_limpio:
-                            contratista_obj, created = Contratista.objects.get_or_create(
-                                nombre=nombre_limpio
+
+                            nombre_normalizado = normalizar_nombre(nombre_limpio)
+
+                            # aplicar alias
+                            nombre_normalizado = ALIAS.get(
+                                nombre_normalizado,
+                                nombre_normalizado
                             )
+
+                            contratista_obj = contratistas_db.get(nombre_normalizado)
+
+                            if not contratista_obj:
+                                print(f"⚠️ Contratista no encontrado: {nombre_limpio}")
 
                 # guardar valor original
                 valor_pago = row.get("Valor pago técnico")
@@ -435,7 +493,6 @@ def subir_excel(request):
     return render(request, "servicios/subir_excel.html", {
         "mensaje": mensaje
     })
-
 
 # ==============================
 # BUSCADOR
@@ -815,7 +872,11 @@ def cambiar_estado_pago(request, servicio_id):
         servicio.estado_pago = request.POST.get("estado_pago")
         servicio.save()
 
-    servicios = ServicioTecnico.objects.filter(contratista=servicio.contratista)
+    servicios = ServicioTecnico.objects.filter(
+        contratista=servicio.contratista,
+        carga__mes=servicio.carga.mes,
+        carga__anio=servicio.carga.anio
+)
 
     resumen = servicios.aggregate(
         total_mantenciones=Count("id"),
@@ -886,7 +947,12 @@ def editar_monto_tecnico(request, servicio_id):
         try:
 
             data = json.loads(request.body)
+
             nuevo_valor = float(data.get("valor_pago_tecnico", 0))
+            mes = data.get("mes")
+            anio = data.get("anio")
+            estado_pago = data.get("estado_pago")
+            tipo_servicio = data.get("tipo_servicio")
 
             servicio = ServicioTecnico.objects.get(id=servicio_id)
 
@@ -905,23 +971,41 @@ def editar_monto_tecnico(request, servicio_id):
                 contratista=contratista
             )
 
+            if mes and anio:
+                servicios = servicios.filter(
+                    carga__mes=mes,
+                    carga__anio=anio
+                )
+
+            if estado_pago:
+                servicios = servicios.filter(estado_pago=estado_pago)
+
+            if tipo_servicio:
+                servicios = servicios.filter(
+                    tipo_servicio__icontains=tipo_servicio
+                )
+
             resumen = servicios.aggregate(
-
-                total_mantenciones=Count("id"),
-
-                total_preventivas=Count(
-                    "id",
-                    filter=Q(tipo_servicio__icontains="PREVENTIV")
-                ),
-
-                total_correctivas=Count(
-                    "id",
-                    filter=Q(tipo_servicio__icontains="CORRECTIV")
-                ),
 
                 monto_total=Coalesce(
                     Sum("valor_pago_tecnico"),
-                    0
+                    Value(0)
+                ),
+
+                monto_preventivas=Coalesce(
+                    Sum(
+                        "valor_pago_tecnico",
+                        filter=Q(tipo_servicio__icontains="PREVENTIV")
+                    ),
+                    Value(0)
+                ),
+
+                monto_correctivas=Coalesce(
+                    Sum(
+                        "valor_pago_tecnico",
+                        filter=Q(tipo_servicio__icontains="CORRECTIV")
+                    ),
+                    Value(0)
                 ),
 
                 monto_aprobado=Coalesce(
@@ -929,7 +1013,7 @@ def editar_monto_tecnico(request, servicio_id):
                         "valor_pago_tecnico",
                         filter=Q(estado_pago="aprobado")
                     ),
-                    0
+                    Value(0)
                 ),
 
                 monto_revision=Coalesce(
@@ -937,7 +1021,7 @@ def editar_monto_tecnico(request, servicio_id):
                         "valor_pago_tecnico",
                         filter=Q(estado_pago="revision")
                     ),
-                    0
+                    Value(0)
                 ),
 
                 monto_rechazado=Coalesce(
@@ -945,13 +1029,20 @@ def editar_monto_tecnico(request, servicio_id):
                         "valor_pago_tecnico",
                         filter=Q(estado_pago="rechazado")
                     ),
-                    0
+                    Value(0)
                 ),
             )
 
             return JsonResponse({
                 "success": True,
-                "resumen": resumen
+                "resumen": {
+                    "monto_total": float(resumen["monto_total"] or 0),
+                    "monto_preventivas": float(resumen["monto_preventivas"] or 0),
+                    "monto_correctivas": float(resumen["monto_correctivas"] or 0),
+                    "monto_aprobado": float(resumen["monto_aprobado"] or 0),
+                    "monto_revision": float(resumen["monto_revision"] or 0),
+                    "monto_rechazado": float(resumen["monto_rechazado"] or 0),
+                }
             })
 
         except Exception as e:
@@ -987,6 +1078,7 @@ def contratista_pdf(request):
     contratista_id = request.GET.get("contratista_id")
     estado_pago = request.GET.get("estado_pago")
     tipo_servicio = request.GET.get("tipo_servicio")
+   
 
     # ==============================
     # CONTRATISTA SELECCIONADO
