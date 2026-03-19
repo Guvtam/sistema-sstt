@@ -10,6 +10,9 @@ class CargaMensual(models.Model):
     def __str__(self):
         return self.nombre
     
+
+
+    
     
     
 class Contratista(models.Model):
@@ -30,6 +33,42 @@ class Contratista(models.Model):
 
     def __str__(self):
         return f"{self.nombre} - {self.nombre_empresa}"
+    
+
+class Tecnico(models.Model):
+    nombre = models.CharField(max_length=150, unique=True)
+    
+    TIPO_CHOICES = [
+        ("interno", "Técnico Interno"),
+        ("contratista", "Técnico Contratista"),
+    ]
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default="interno")
+    
+    CATEGORIA_CHOICES = [
+        ("principal", "Principal"),
+        ("remoto", "Remoto"),
+    ]
+    categoria = models.CharField(max_length=20, choices=CATEGORIA_CHOICES, default="remoto")
+    
+    contratista = models.ForeignKey(
+        Contratista,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tecnicos"
+    )
+    
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def tecnico_nombre(self):
+        """Obtiene el nombre del técnico de forma segura"""
+        if self.tecnico_obj:
+            return self.tecnico_obj.nombre
+        return self.tecnico  # Fallback al campo legacy
+    
+    def __str__(self):
+        return f"{self.nombre} ({self.tipo}/{self.categoria})"
 
 
 class ServicioTecnico(models.Model):
@@ -56,7 +95,14 @@ class ServicioTecnico(models.Model):
 
     cuenta = models.CharField(max_length=150, null=True, blank=True)
     telefono = models.CharField(max_length=50, null=True, blank=True)
-    tecnico = models.CharField(max_length=150, null=True, blank=True)
+    tecnico = models.CharField(max_length=150, null=True, blank=True)  # Legacy, para transición
+    tecnico_obj = models.ForeignKey(
+        Tecnico,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="servicios"
+    )
     direccion = models.CharField(max_length=255, null=True, blank=True)
     provincia_estado = models.CharField(max_length=150, null=True, blank=True)
     localidad = models.CharField(max_length=150, null=True, blank=True)
@@ -129,3 +175,7 @@ class CECO(models.Model):
 
     class Meta:
         unique_together = ("cuenta", "ceco")  # 🔥 CLAVE REAL
+
+
+
+

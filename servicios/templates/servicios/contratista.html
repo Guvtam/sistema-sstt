@@ -58,7 +58,7 @@
 
     <div class="col-md-2">
         <select name="tipo_servicio" class="form-select" onchange="this.form.submit()">
-            <option value="">Todos</option>
+            <option value="">Seleccione tipo servicio</option>
             <option value="PREVENTIV" {% if tipo_servicio == "PREVENTIV" %}selected{% endif %}>Preventivas</option>
             <option value="CORRECTIV" {% if tipo_servicio == "CORRECTIV" %}selected{% endif %}>Correctivas</option>
         </select>
@@ -66,7 +66,7 @@
 
     <div class="col-md-2">
         <select name="provincia_estado" class="form-select" onchange="this.form.submit()">
-            <option value="">Todas</option>
+            <option value="">Seleccione provincia-estado</option>
             {% for p in provincia %}
                 <option value="{{ p }}" {% if p == provincia_estado_sel %}selected{% endif %}>
                     {{ p }}
@@ -77,7 +77,7 @@
 
     <div class="col-md-2">
         <select name="estado_pago" class="form-select" onchange="this.form.submit()">
-            <option value="">Todos</option>
+            <option value="">Seleccione estado de pago</option>
             <option value="aprobado" {% if estado_pago == "aprobado" %}selected{% endif %}>Aprobados</option>
             <option value="revision" {% if estado_pago == "revision" %}selected{% endif %}>Revisión</option>
             <option value="rechazado" {% if estado_pago == "rechazado" %}selected{% endif %}>Rechazados</option>

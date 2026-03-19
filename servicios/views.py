@@ -574,8 +574,8 @@ def contratista(request):
 
     cargas = CargaMensual.objects.all().order_by("-fecha_carga")
 
-    mes = request.GET.get("mes")
-    anio = request.GET.get("anio")
+    mes = request.GET.get("mes") 
+    anio = request.GET.get("anio") 
     carga_id = request.GET.get("carga")
     contratista_id = request.GET.get("contratista_id")
     estado_pago = request.GET.get("estado_pago")
@@ -585,12 +585,15 @@ def contratista(request):
     # ==============================
     # DEFAULT MES/AÑO
     # ==============================
-    if not mes or not anio:
+    if "mes" not in request.GET and "anio" not in request.GET:
         ultima_carga = CargaMensual.objects.order_by("-anio", "-mes").first()
         if ultima_carga:
             mes = str(ultima_carga.mes)
             anio = str(ultima_carga.anio)
 
+    # 🔥 si vienen vacíos → es "Todos"
+    mes = mes or ""
+    anio = anio or ""
     # ==============================
     # CONTRATISTAS
     # ==============================
@@ -879,17 +882,85 @@ def cambiar_estado_pago(request, servicio_id):
 )
 
     resumen = servicios.aggregate(
+
         total_mantenciones=Count("id"),
+
         monto_total=Coalesce(Sum("valor_pago_tecnico"), Value(0)),
-        monto_preventivas=Coalesce(Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="PREVENTIV")), Value(0)),
-        monto_correctivas=Coalesce(Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="CORRECTIV")), Value(0)),
-        monto_aprobado=Coalesce(Sum("valor_pago_tecnico", filter=Q(estado_pago="aprobado")), Value(0)),
-        monto_revision=Coalesce(Sum("valor_pago_tecnico", filter=Q(estado_pago="revision")), Value(0)),
-        monto_rechazado=Coalesce(Sum("valor_pago_tecnico", filter=Q(estado_pago="rechazado")), Value(0)),
+
+        # MONTOS
+        monto_preventivas=Coalesce(
+            Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="PREVENTIV")),
+            Value(0)
+        ),
+
+        monto_correctivas=Coalesce(
+            Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="CORRECTIV")),
+            Value(0)
+        ),
+
+        monto_aprobado=Coalesce(
+            Sum("valor_pago_tecnico", filter=Q(estado_pago="aprobado")),
+            Value(0)
+        ),
+
+        monto_revision=Coalesce(
+            Sum("valor_pago_tecnico", filter=Q(estado_pago="revision")),
+            Value(0)
+        ),
+
+        monto_rechazado=Coalesce(
+            Sum("valor_pago_tecnico", filter=Q(estado_pago="rechazado")),
+            Value(0)
+        ),
+
+        # CANTIDADES
         cantidad_aprobado=Count("id", filter=Q(estado_pago="aprobado")),
         cantidad_revision=Count("id", filter=Q(estado_pago="revision")),
         cantidad_rechazado=Count("id", filter=Q(estado_pago="rechazado")),
+
+        # 🔥 AQUÍ ESTÁ LO QUE TE FALTA
+        aprobado_preventivas=Count("id", filter=Q(
+            estado_pago="aprobado",
+            tipo_servicio__icontains="PREVENTIV"
+        )),
+
+        aprobado_correctivas=Count("id", filter=Q(
+            estado_pago="aprobado",
+            tipo_servicio__icontains="CORRECTIV"
+        )),
+
+        revision_preventivas=Count("id", filter=Q(
+            estado_pago="revision",
+            tipo_servicio__icontains="PREVENTIV"
+        )),
+
+        revision_correctivas=Count("id", filter=Q(
+            estado_pago="revision",
+            tipo_servicio__icontains="CORRECTIV"
+        )),
+
+        rechazado_preventivas=Count("id", filter=Q(
+            estado_pago="rechazado",
+            tipo_servicio__icontains="PREVENTIV"
+        )),
+
+        rechazado_correctivas=Count("id", filter=Q(
+            estado_pago="rechazado",
+            tipo_servicio__icontains="CORRECTIV"
+        )),
     )
+    resumen = servicios.aggregate(
+            total_mantenciones=Count("id"),
+            monto_total=Coalesce(Sum("valor_pago_tecnico"), Value(0)),
+            monto_preventivas=Coalesce(Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="PREVENTIV")), Value(0)),
+            monto_correctivas=Coalesce(Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="CORRECTIV")), Value(0)),
+            monto_aprobado=Coalesce(Sum("valor_pago_tecnico", filter=Q(estado_pago="aprobado")), Value(0)),
+            monto_revision=Coalesce(Sum("valor_pago_tecnico", filter=Q(estado_pago="revision")), Value(0)),
+            monto_rechazado=Coalesce(Sum("valor_pago_tecnico", filter=Q(estado_pago="rechazado")), Value(0)),
+            cantidad_aprobado=Count("id", filter=Q(estado_pago="aprobado")),
+            cantidad_revision=Count("id", filter=Q(estado_pago="revision")),
+            cantidad_rechazado=Count("id", filter=Q(estado_pago="rechazado")),
+        )
 
     return JsonResponse({"success": True, "resumen": resumen})
 
