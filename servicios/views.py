@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 from io import BytesIO
 
 import pandas as pd
+from django.db import transaction
 from django.db.models import Count, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
@@ -15,10 +16,8 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from xhtml2pdf import pisa
-from django.db import transaction
 
 from .models import CECO, CargaMensual, Contratista, ServicioTecnico, Tecnico, CuentaB2B
-
 
 logger = logging.getLogger(__name__)
 
@@ -27,70 +26,6 @@ logger = logging.getLogger(__name__)
 # FUNCIONES AUXILIARES
 # ==============================
 
-def convertir_fecha(valor):
-    if valor is None or valor == "":
-        return None
-
-    try:
-        if isinstance(valor, pd.Timestamp):
-            if pd.isna(valor):
-                return None
-            fecha = valor.to_pydatetime()
-
-        elif isinstance(valor, datetime):
-            fecha = valor
-
-        else:
-            texto = str(valor).strip()
-
-            for formato in [
-                "%d/%m/%Y %H:%M:%S",
-                "%d-%m-%Y %H:%M:%S",
-                "%d/%m/%Y %H:%M",
-                "%d-%m-%Y %H:%M",
-                "%d/%m/%Y",
-                "%d-%m-%Y",
-            ]:
-                try:
-                    fecha = datetime.strptime(texto, formato)
-                    break
-                except ValueError:
-                    fecha = None
-
-            if fecha is None:
-                fecha = pd.to_datetime(texto, errors="coerce", dayfirst=True)
-                if pd.isna(fecha):
-                    return None
-                fecha = fecha.to_pydatetime()
-
-        if timezone.is_naive(fecha):
-            fecha = timezone.make_aware(fecha)
-
-        return fecha
-
-    except Exception:
-        return None
-
-
-def limpiar_fecha(valor):
-    if valor is None:
-        return None
-
-    # detectar NaT / NaN de pandas
-    if pd.isna(valor):
-        return None
-
-    if isinstance(valor, pd.Timestamp):
-        valor = valor.to_pydatetime()
-
-    if isinstance(valor, datetime):
-        if timezone.is_naive(valor):
-            return timezone.make_aware(valor)
-        return valor
-
-    return None
-
-
 def quitar_tildes(texto):
     if not texto:
         return ""
@@ -98,21 +33,6 @@ def quitar_tildes(texto):
         c for c in unicodedata.normalize("NFKD", str(texto))
         if not unicodedata.combining(c)
     )
-
-
-def limpiar_nombre_tecnico(valor):
-    if valor is None:
-        return None
-
-    valor = str(valor).strip()
-
-    if valor.upper() in ["", "NULL", "NONE", "NAN"]:
-        return None
-
-    valor = re.sub(r"^T\.?\s*INTERNO\s*-\s*", "", valor, flags=re.IGNORECASE)
-    valor = re.sub(r"^T\.?\s*EXTERNO\s*-\s*", "", valor, flags=re.IGNORECASE)
-
-    return valor.strip()
 
 
 def normalizar_nombre(valor):
@@ -137,21 +57,146 @@ def normalizar_nombre(valor):
     return valor.strip()
 
 
-def extraer_cuenta_contable(valor):
-    if not valor:
+def limpiar_nombre_tecnico(valor):
+    if valor is None:
         return None
+
+    valor = str(valor).strip()
+
+    if valor.upper() in ["", "NULL", "NONE", "NAN"]:
+        return None
+
+    valor = re.sub(r"^T\.?\s*INTERNO\s*-\s*", "", valor, flags=re.IGNORECASE)
+    valor = re.sub(r"^T\.?\s*EXTERNO\s*-\s*", "", valor, flags=re.IGNORECASE)
+
+    return valor.strip()
+
+
+def normalizar_cuenta(valor):
+    if valor is None:
+        return ""
+
+    valor = str(valor).strip().upper()
+
+    if valor in ["", "NAN", "NONE", "NULL"]:
+        return ""
+
+    # quitar todos los espacios
+    valor = re.sub(r"\s+", "", valor)
+
+    # FIR-005C / FIR005C / FIR_005C -> FIR-005C
+    match_fir = re.match(r"^FIR[-_]?([A-Z0-9]+)$", valor)
+    if match_fir:
+        return f"FIR-{match_fir.group(1)}"
+
+    # NEW-SF_99 / NEWSF99 / NEW-SF-99 / NEWSF_99 -> NEW-SF_99
+    match_new = re.match(r"^NEW[-_]?SF[-_]?([A-Z0-9]+)$", valor)
+    if match_new:
+        return f"NEW-SF_{match_new.group(1)}"
+
+    return valor
+
+
+def extraer_cuenta_contable(valor):
+    if valor is None:
+        return ""
 
     texto = str(valor).strip().upper()
 
-    # FIR-005C / FIR - 005C / FIR 005C
+    if texto in ["", "NAN", "NONE", "NULL"]:
+        return ""
+
+    # Buscar FIR
     match = re.search(r"FIR\s*-?\s*[A-Z0-9]+", texto)
     if match:
         return normalizar_cuenta(match.group(0))
 
-    # NEW-SF_123 / NEW - SF_123 / NEW SF_123
-    match = re.search(r"NEW\s*-?\s*SF[_-]?\d+", texto)
+    # Buscar NEW-SF
+    match = re.search(r"NEW\s*-?\s*SF[_-]?\s*[A-Z0-9]+", texto)
     if match:
         return normalizar_cuenta(match.group(0))
+
+    return ""
+
+
+def clasificar_b2b(cuenta, cuentas_b2b_set):
+    cuenta_extraida = extraer_cuenta_contable(cuenta)
+    cuenta_normalizada = normalizar_cuenta(cuenta_extraida)
+    return cuenta_normalizada in cuentas_b2b_set, cuenta_extraida
+
+
+def convertir_fecha(valor):
+    if valor is None or valor == "":
+        return None
+
+    try:
+        if pd.isna(valor):
+            return None
+    except Exception:
+        pass
+
+    try:
+        if isinstance(valor, pd.Timestamp):
+            if pd.isna(valor):
+                return None
+            fecha = valor.to_pydatetime()
+
+        elif isinstance(valor, datetime):
+            fecha = valor
+
+        else:
+            texto = str(valor).strip()
+
+            if texto.upper() in ["", "NAN", "NONE", "NULL"]:
+                return None
+
+            fecha = None
+            for formato in [
+                "%d/%m/%Y %H:%M:%S",
+                "%d-%m-%Y %H:%M:%S",
+                "%d/%m/%Y %H:%M",
+                "%d-%m-%Y %H:%M",
+                "%d/%m/%Y",
+                "%d-%m-%Y",
+            ]:
+                try:
+                    fecha = datetime.strptime(texto, formato)
+                    break
+                except ValueError:
+                    pass
+
+            if fecha is None:
+                fecha = pd.to_datetime(texto, errors="coerce", dayfirst=True)
+                if pd.isna(fecha):
+                    return None
+                fecha = fecha.to_pydatetime()
+
+        if timezone.is_naive(fecha):
+            fecha = timezone.make_aware(fecha)
+
+        return fecha
+
+    except Exception:
+        return None
+
+
+def limpiar_fecha(valor):
+    if valor is None:
+        return None
+
+    try:
+        if pd.isna(valor):
+            return None
+    except Exception:
+        pass
+
+    if isinstance(valor, pd.Timestamp):
+        valor = valor.to_pydatetime()
+
+    if isinstance(valor, datetime):
+        if timezone.is_naive(valor):
+            return timezone.make_aware(valor)
+        return valor
 
     return None
 
@@ -348,6 +393,13 @@ def obtener_resumen_estado_qs(servicios):
     )
 
 
+def obtener_ceco(servicio):
+    return CECO.objects.filter(
+        cuenta=servicio.cuenta_contable,
+        ceco=getattr(servicio, "ceco_codigo", None)
+    ).first()
+
+
 # ==============================
 # PÁGINAS BASE
 # ==============================
@@ -479,27 +531,30 @@ def subir_excel(request):
 
         if nombre_carga and archivo1 and archivo2:
             try:
+                # Primero validar lectura antes de borrar datos anteriores
+                dataframes = []
+
+                for archivo in [archivo1, archivo2]:
+                    archivo.seek(0)
+                    tablas = pd.read_html(archivo)
+                    if tablas:
+                        dataframes.append(tablas[0])
+
+                if not dataframes:
+                    raise ValueError("No se encontraron tablas válidas en los archivos.")
+
+                df = pd.concat(dataframes, ignore_index=True)
+                df.columns = df.columns.astype(str).str.strip()
+
                 with transaction.atomic():
+                    # Reemplazar solo cuando ya está validado el DataFrame
                     CargaMensual.objects.filter(nombre=nombre_carga).delete()
 
                     carga = CargaMensual.objects.create(
                         nombre=nombre_carga,
-                        mes=mes,
-                        anio=anio,
+                        mes=int(mes) if mes else None,
+                        anio=int(anio) if anio else None,
                     )
-
-                    dataframes = []
-
-                    for archivo in [archivo1, archivo2]:
-                        tablas = pd.read_html(archivo)
-                        if tablas:
-                            dataframes.append(tablas[0])
-
-                    if not dataframes:
-                        raise ValueError("No se encontraron tablas válidas en los archivos.")
-
-                    df = pd.concat(dataframes, ignore_index=True)
-                    df.columns = df.columns.str.strip()
 
                     # limpiar monto pago técnico
                     if "Valor pago técnico" in df.columns:
@@ -508,38 +563,53 @@ def subir_excel(request):
                             .astype(str)
                             .str.replace(r"\.(?=\d{3})", "", regex=True)
                             .str.replace(",", "", regex=False)
+                            .str.strip()
                         )
                         df["Valor pago técnico"] = pd.to_numeric(
                             df["Valor pago técnico"],
                             errors="coerce"
-                        ).fillna(0).astype(int)
+                        ).fillna(0)
 
                     # limpiar valor general
                     if "Valor" in df.columns:
-                        df["Valor"] = pd.to_numeric(
-                            df["Valor"].astype(str).str.replace(",", "", regex=False),
-                            errors="coerce"
+                        df["Valor"] = (
+                            df["Valor"]
+                            .astype(str)
+                            .str.replace(r"\.(?=\d{3})", "", regex=True)
+                            .str.replace(",", "", regex=False)
+                            .str.strip()
                         )
+                        df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce")
 
                     # limpiar costo mano de obra
                     if "Costo mano de obra" in df.columns:
+                        df["Costo mano de obra"] = (
+                            df["Costo mano de obra"]
+                            .astype(str)
+                            .str.replace(r"\.(?=\d{3})", "", regex=True)
+                            .str.replace(",", "", regex=False)
+                            .str.strip()
+                        )
                         df["Costo mano de obra"] = pd.to_numeric(
-                            df["Costo mano de obra"].astype(str).str.replace(",", "", regex=False),
+                            df["Costo mano de obra"],
                             errors="coerce"
                         )
 
-                    # cuenta contable
+                    # cuenta contable desde cuenta original
                     if "Cuenta" in df.columns:
                         df["cuenta_contable"] = df["Cuenta"].apply(extraer_cuenta_contable)
                     else:
-                        df["cuenta_contable"] = None
+                        df["cuenta_contable"] = ""
 
                     # fecha visita
-                    df["fecha_visita_convertida"] = pd.to_datetime(
-                        df.get("Fecha de la visita"),
-                        errors="coerce",
-                        dayfirst=True
-                    )
+                    if "Fecha de la visita" in df.columns:
+                        df["fecha_visita_convertida"] = pd.to_datetime(
+                            df["Fecha de la visita"],
+                            errors="coerce",
+                            dayfirst=True
+                        )
+                    else:
+                        df["fecha_visita_convertida"] = pd.NaT
 
                     df["fecha_visita_solo_dia"] = df["fecha_visita_convertida"].dt.date
 
@@ -557,19 +627,25 @@ def subir_excel(request):
                     # diccionario de contratistas
                     contratistas_db = {}
                     for c in Contratista.objects.all():
-                        contratistas_db[normalizar_nombre(c.nombre)] = c
-                        contratistas_db[normalizar_nombre(c.nombre_empresa)] = c
+                        if c.nombre:
+                            contratistas_db[normalizar_nombre(c.nombre)] = c
+                        if c.nombre_empresa:
+                            contratistas_db[normalizar_nombre(c.nombre_empresa)] = c
 
                     # diccionario de técnicos
                     tecnicos_db = {}
                     for t in Tecnico.objects.select_related("contratista").all():
-                        tecnicos_db[normalizar_nombre(t.nombre)] = t
+                        if t.nombre:
+                            tecnicos_db[normalizar_nombre(t.nombre)] = t
 
                     # set de cuentas b2b normalizadas
                     cuentas_b2b_set = {
                         normalizar_cuenta(c)
                         for c in CuentaB2B.objects.values_list("cuenta", flat=True)
+                        if c
                     }
+
+                    servicios_a_crear = []
 
                     for _, row in df.iterrows():
                         nombre_original = row.get("Tecnico")
@@ -590,9 +666,8 @@ def subir_excel(request):
                                 if tecnico_obj:
                                     tecnicos_db[nombre_normalizado] = tecnico_obj
 
-                            if not tecnico_obj:
+                            if not tecnico_obj and nombre_limpio:
                                 texto_original = str(nombre_original or "").upper().strip()
-
                                 es_contratista = False
 
                                 if texto_original.startswith("T. EXTERNO") or texto_original.startswith("T EXTERNO"):
@@ -631,7 +706,7 @@ def subir_excel(request):
 
                                 tecnicos_db[nombre_normalizado] = tecnico_obj
 
-                            if tecnico_obj.tipo == "contratista":
+                            if tecnico_obj and tecnico_obj.tipo == "contratista":
                                 contratista_obj = tecnico_obj.contratista
 
                                 if not contratista_obj:
@@ -644,40 +719,42 @@ def subir_excel(request):
                         valor_general = row.get("Valor")
                         costo_mano_obra = row.get("Costo mano de obra")
 
-                        cuenta_contable = row.get("cuenta_contable")
-                        cuenta_normalizada = normalizar_cuenta(cuenta_contable)
-                        es_b2b = cuenta_normalizada in cuentas_b2b_set
+                        es_b2b, cuenta_contable = clasificar_b2b(row.get("Cuenta"), cuentas_b2b_set)
 
-                        ServicioTecnico.objects.create(
-                            carga=carga,
-                            numero=row.get("Número"),
-                            fecha_creacion=convertir_fecha(row.get("Fecha de Creación")),
-                            fecha_modificacion=convertir_fecha(row.get("Fecha de modificación")),
-                            fecha_visita=limpiar_fecha(row.get("fecha_visita_convertida")),
-                            fecha_finalizacion=convertir_fecha(row.get("Fecha de finalizacion")),
-                            cuenta=row.get("Cuenta"),
-                            cuenta_contable=cuenta_contable,
-                            es_b2b=es_b2b,
-                            telefono=row.get("Teléfono"),
-                            tecnico=nombre_limpio,
-                            tecnico_obj=tecnico_obj,
-                            contratista=contratista_obj,
-                            direccion=row.get("Dirección"),
-                            provincia_estado=row.get("Provincia-Estado"),
-                            localidad=row.get("Localidad"),
-                            tipo_servicio=row.get("Tipo de Servicio"),
-                            servicio=row.get("Servicio"),
-                            observaciones=row.get("Observaciones (Insumos)"),
-                            estado=row.get("Estado"),
-                            usuario=row.get("Usuario"),
-                            valor=valor_general if pd.notna(valor_general) else None,
-                            costo_mano_obra=costo_mano_obra if pd.notna(costo_mano_obra) else None,
-                            fecha_pago=convertir_fecha(row.get("Fecha de pago")),
-                            valor_pago_original=valor_pago if pd.notna(valor_pago) else 0,
-                            valor_pago_tecnico=valor_pago if pd.notna(valor_pago) else 0,
-                            tiempo_trabajo_total=row.get("Tiempo de Trabajo Total"),
-                            numero_incidencias_dia=row.get("numero_incidencias_dia") or 0,
+                        servicios_a_crear.append(
+                            ServicioTecnico(
+                                carga=carga,
+                                numero=row.get("Número"),
+                                fecha_creacion=convertir_fecha(row.get("Fecha de Creación")),
+                                fecha_modificacion=convertir_fecha(row.get("Fecha de modificación")),
+                                fecha_visita=limpiar_fecha(row.get("fecha_visita_convertida")),
+                                fecha_finalizacion=convertir_fecha(row.get("Fecha de finalizacion")),
+                                cuenta=row.get("Cuenta"),
+                                cuenta_contable=cuenta_contable,
+                                es_b2b=es_b2b,
+                                telefono=row.get("Teléfono"),
+                                tecnico=nombre_limpio,
+                                tecnico_obj=tecnico_obj,
+                                contratista=contratista_obj,
+                                direccion=row.get("Dirección"),
+                                provincia_estado=row.get("Provincia-Estado"),
+                                localidad=row.get("Localidad"),
+                                tipo_servicio=row.get("Tipo de Servicio"),
+                                servicio=row.get("Servicio"),
+                                observaciones=row.get("Observaciones (Insumos)"),
+                                estado=row.get("Estado"),
+                                usuario=row.get("Usuario"),
+                                valor=valor_general if pd.notna(valor_general) else None,
+                                costo_mano_obra=costo_mano_obra if pd.notna(costo_mano_obra) else None,
+                                fecha_pago=convertir_fecha(row.get("Fecha de pago")),
+                                valor_pago_original=valor_pago if pd.notna(valor_pago) else 0,
+                                valor_pago_tecnico=valor_pago if pd.notna(valor_pago) else 0,
+                                tiempo_trabajo_total=row.get("Tiempo de Trabajo Total"),
+                                numero_incidencias_dia=int(row.get("numero_incidencias_dia") or 0),
+                            )
                         )
+
+                    ServicioTecnico.objects.bulk_create(servicios_a_crear, batch_size=1000)
 
                 mensaje = "Carga procesada correctamente"
 
@@ -879,7 +956,8 @@ def actualizar_monto(request, servicio_id):
         nuevo_valor = request.POST.get("valor")
 
         try:
-            servicio.valor_pago_tecnico = int(Decimal(nuevo_valor))
+            valor_limpio = str(nuevo_valor).replace(".", "").replace(",", "").strip()
+            servicio.valor_pago_tecnico = int(Decimal(valor_limpio))
             servicio.save()
             return JsonResponse({"success": True})
         except (InvalidOperation, TypeError, ValueError):
@@ -908,7 +986,9 @@ def editar_monto_tecnico(request, servicio_id):
         try:
             data = json.loads(request.body)
 
-            nuevo_valor = int(float(data.get("valor_pago_tecnico", 0) or 0))
+            valor_raw = str(data.get("valor_pago_tecnico", "0")).replace(".", "").replace(",", "").strip()
+            nuevo_valor = int(Decimal(valor_raw or 0))
+
             mes = data.get("mes")
             anio = data.get("anio")
             estado_pago = data.get("estado_pago")
@@ -981,17 +1061,6 @@ def editar_monto_tecnico(request, servicio_id):
         "success": False,
         "error": "Método no permitido"
     })
-
-
-# ==============================
-# OBTENER CECO
-# ==============================
-
-def obtener_ceco(servicio):
-    return CECO.objects.filter(
-        cuenta=servicio.cuenta_contable,
-        ceco=getattr(servicio, "ceco_codigo", None)
-    ).first()
 
 
 # ==============================
@@ -1100,7 +1169,10 @@ def exportar_excel(request):
             try:
                 df[col] = df[col].dt.tz_localize(None)
             except Exception:
-                pass
+                try:
+                    df[col] = pd.to_datetime(df[col]).dt.tz_localize(None)
+                except Exception:
+                    pass
 
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -1109,15 +1181,3 @@ def exportar_excel(request):
 
     df.to_excel(response, index=False)
     return response
-
-
-
-def normalizar_cuenta(valor):
-    if not valor:
-        return ""
-
-    valor = str(valor).strip().upper()
-    valor = re.sub(r"\s*-\s*", "-", valor)   # deja guion uniforme
-    valor = re.sub(r"\s+", "", valor)        # elimina todos los espacios
-
-    return valor
