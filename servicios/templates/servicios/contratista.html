@@ -109,12 +109,20 @@
             </div>
 
             <div class="kpi-card text-center">
+
                 <div class="kpi-title">Total Mantenciones</div>
                 <div class="kpi-value">{{ resumen.total_mantenciones|default:0 }}</div>
-                <div class="small text-muted">Monto</div>
-                <div class="kpi-value" id="monto_total">
+
+                <div class="small text-muted mt-2">Monto total</div>
+                <div class="kpi-value text-dark" id="monto_total">
                     ${{ resumen.monto_total|default:0|floatformat:0|intcomma }}
                 </div>
+
+                <div class="small text-muted mt-2">Monto aprobado</div>
+                <div class="kpi-value text-success" id="monto_aprobado">
+                    ${{ resumen.monto_aprobado|default:0|floatformat:0|intcomma }}
+                </div>
+
             </div>
         </div>
 

@@ -9,47 +9,42 @@ class CargaMensual(models.Model):
 
     def __str__(self):
         return self.nombre
-    
 
 
-    
-    
-    
 class Contratista(models.Model):
     nombre = models.CharField(max_length=150)
     nombre_empresa = models.CharField(max_length=150)
     rut = models.CharField(max_length=12, blank=True, null=True)
-    fono = models.CharField(max_length=20, blank=True, null=True)  # Número telefónico
+    fono = models.CharField(max_length=20, blank=True, null=True)
     correo = models.EmailField(blank=True, null=True)
     ciudad = models.CharField(max_length=100, blank=True, null=True)
-    
+
     banco = models.CharField(max_length=50, blank=True, null=True)
     tipo_cuenta = models.CharField(max_length=50, blank=True, null=True)
     numero_cuenta = models.CharField(max_length=30, blank=True, null=True)
-    
+
     categoria = models.CharField(max_length=50, blank=True, null=True)
-    
-    fecha_creacion = models.DateTimeField(auto_now_add=True)  # Para saber cuándo se agregó
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.nombre} - {self.nombre_empresa}"
-    
+
 
 class Tecnico(models.Model):
-    nombre = models.CharField(max_length=150, unique=True)
-    
     TIPO_CHOICES = [
         ("interno", "Técnico Interno"),
         ("contratista", "Técnico Contratista"),
     ]
-    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default="interno")
-    
+
     CATEGORIA_CHOICES = [
         ("principal", "Principal"),
         ("remoto", "Remoto"),
     ]
+
+    nombre = models.CharField(max_length=150, unique=True)
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default="interno")
     categoria = models.CharField(max_length=20, choices=CATEGORIA_CHOICES, default="remoto")
-    
+
     contratista = models.ForeignKey(
         Contratista,
         on_delete=models.SET_NULL,
@@ -57,21 +52,28 @@ class Tecnico(models.Model):
         blank=True,
         related_name="tecnicos"
     )
-    
+
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
-    @property
-    def tecnico_nombre(self):
-        """Obtiene el nombre del técnico de forma segura"""
-        if self.tecnico_obj:
-            return self.tecnico_obj.nombre
-        return self.tecnico  # Fallback al campo legacy
-    
     def __str__(self):
         return f"{self.nombre} ({self.tipo}/{self.categoria})"
 
 
+class CuentaB2B(models.Model):
+    cuenta = models.CharField(max_length=50)
+    nombre = models.CharField(max_length=255, null=True, blank=True)
+    kam = models.CharField(max_length=150, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.cuenta} - {self.nombre}"
+
+
 class ServicioTecnico(models.Model):
+    ESTADO_PAGO_CHOICES = [
+        ("aprobado", "Aprobado"),
+        ("revision", "En Revisión"),
+        ("rechazado", "Rechazado"),
+    ]
 
     carga = models.ForeignKey(
         CargaMensual,
@@ -95,7 +97,8 @@ class ServicioTecnico(models.Model):
 
     cuenta = models.CharField(max_length=150, null=True, blank=True)
     telefono = models.CharField(max_length=50, null=True, blank=True)
-    tecnico = models.CharField(max_length=150, null=True, blank=True)  # Legacy, para transición
+
+    tecnico = models.CharField(max_length=150, null=True, blank=True)  # respaldo texto
     tecnico_obj = models.ForeignKey(
         Tecnico,
         on_delete=models.SET_NULL,
@@ -103,6 +106,7 @@ class ServicioTecnico(models.Model):
         blank=True,
         related_name="servicios"
     )
+
     direccion = models.CharField(max_length=255, null=True, blank=True)
     provincia_estado = models.CharField(max_length=150, null=True, blank=True)
     localidad = models.CharField(max_length=150, null=True, blank=True)
@@ -117,51 +121,33 @@ class ServicioTecnico(models.Model):
     costo_mano_obra = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     fecha_pago = models.DateTimeField(null=True, blank=True)
 
-    @property
-    def clasificacion(self):
-        from .models import CuentaB2B
-        if self.cuenta_contable and CuentaB2B.objects.filter(cuenta=self.cuenta_contable).exists():
-            return "B2B"
-        return "B2C"
-
-    # MONTO ORIGINAL DEL EXCEL (NO SE MODIFICA)
     valor_pago_original = models.IntegerField(null=True, blank=True)
-
-    # MONTO QUE SE PUEDE EDITAR PARA PAGAR
     valor_pago_tecnico = models.IntegerField(null=True, blank=True)
 
     tiempo_trabajo_total = models.CharField(max_length=100, null=True, blank=True)
     cuenta_contable = models.CharField(max_length=20, null=True, blank=True)
     numero_incidencias_dia = models.IntegerField(default=0)
 
-    ESTADO_PAGO_CHOICES = [
-        ("aprobado", "Aprobado"),
-        ("revision", "En Revisión"),
-        ("rechazado", "Rechazado"),
-    ]
-
     estado_pago = models.CharField(
         max_length=20,
         choices=ESTADO_PAGO_CHOICES,
         default="aprobado"
     )
+    es_b2b = models.BooleanField(default=False)
+
+    @property
+    def clasificacion(self):
+        return "B2B" if self.es_b2b else "B2C"
+
+    @property
+    def tipo_tecnico(self):
+        if self.tecnico_obj:
+            return self.tecnico_obj.tipo
+        return "contratista" if self.contratista_id else "interno"
 
     def __str__(self):
         cuenta = self.cuenta_contable if self.cuenta_contable else "Sin cuenta"
         return f"{self.numero} - {cuenta}"
-
-
-
-class CuentaB2B(models.Model):
-    cuenta = models.CharField(max_length=50)
-    nombre = models.CharField(max_length=255, null=True, blank=True)
-    kam = models.CharField(max_length=150, null=True, blank=True)
-
-    
-
-    def __str__(self):
-        return f"{self.cuenta} - {self.nombre}"
-    
 
 
 class CECO(models.Model):
@@ -174,8 +160,4 @@ class CECO(models.Model):
         return f"{self.cuenta} - {self.ceco} - {self.nombre}"
 
     class Meta:
-        unique_together = ("cuenta", "ceco")  # 🔥 CLAVE REAL
-
-
-
-
+        unique_together = ("cuenta", "ceco")
