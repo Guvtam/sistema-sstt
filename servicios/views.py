@@ -926,24 +926,10 @@ def cambiar_estado_pago(request, servicio_id):
 
     if request.method == "POST":
         servicio.estado_pago = request.POST.get("estado_pago")
-        servicio.save()
+        servicio.save(update_fields=["estado_pago"])
+        return JsonResponse({"success": True})
 
-    servicios = ServicioTecnico.objects.filter(
-        carga__mes=servicio.carga.mes,
-        carga__anio=servicio.carga.anio
-    )
-
-    if servicio.contratista_id:
-        servicios = servicios.filter(contratista=servicio.contratista)
-    else:
-        servicios = servicios.filter(
-            Q(tecnico_obj__tipo="interno") |
-            Q(tecnico_obj__isnull=True, contratista__isnull=True)
-        )
-
-    resumen = obtener_resumen_estado_qs(servicios)
-
-    return JsonResponse({"success": True, "resumen": resumen})
+    return JsonResponse({"success": False, "error": "Método no permitido"})
 
 
 # ==============================
@@ -989,67 +975,15 @@ def editar_monto_tecnico(request, servicio_id):
             valor_raw = str(data.get("valor_pago_tecnico", "0")).replace(".", "").replace(",", "").strip()
             nuevo_valor = int(Decimal(valor_raw or 0))
 
-            mes = data.get("mes")
-            anio = data.get("anio")
-            estado_pago = data.get("estado_pago")
-            tipo_servicio = data.get("tipo_servicio")
-
             servicio = ServicioTecnico.objects.get(id=servicio_id)
 
             if servicio.valor_pago_original is None:
                 servicio.valor_pago_original = servicio.valor_pago_tecnico
 
             servicio.valor_pago_tecnico = nuevo_valor
-            servicio.save()
+            servicio.save(update_fields=["valor_pago_tecnico", "valor_pago_original"])
 
-            servicios = ServicioTecnico.objects.filter(
-                contratista=servicio.contratista
-            )
-
-            if mes and anio:
-                servicios = servicios.filter(carga__mes=mes, carga__anio=anio)
-
-            if estado_pago:
-                servicios = servicios.filter(estado_pago=estado_pago)
-
-            if tipo_servicio:
-                servicios = servicios.filter(tipo_servicio__icontains=tipo_servicio)
-
-            resumen = servicios.aggregate(
-                monto_total=Coalesce(Sum("valor_pago_tecnico"), Value(0)),
-                monto_preventivas=Coalesce(
-                    Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="PREVENTIV")),
-                    Value(0)
-                ),
-                monto_correctivas=Coalesce(
-                    Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="CORRECTIV")),
-                    Value(0)
-                ),
-                monto_aprobado=Coalesce(
-                    Sum("valor_pago_tecnico", filter=Q(estado_pago="aprobado")),
-                    Value(0)
-                ),
-                monto_revision=Coalesce(
-                    Sum("valor_pago_tecnico", filter=Q(estado_pago="revision")),
-                    Value(0)
-                ),
-                monto_rechazado=Coalesce(
-                    Sum("valor_pago_tecnico", filter=Q(estado_pago="rechazado")),
-                    Value(0)
-                ),
-            )
-
-            return JsonResponse({
-                "success": True,
-                "resumen": {
-                    "monto_total": float(resumen["monto_total"] or 0),
-                    "monto_preventivas": float(resumen["monto_preventivas"] or 0),
-                    "monto_correctivas": float(resumen["monto_correctivas"] or 0),
-                    "monto_aprobado": float(resumen["monto_aprobado"] or 0),
-                    "monto_revision": float(resumen["monto_revision"] or 0),
-                    "monto_rechazado": float(resumen["monto_rechazado"] or 0),
-                }
-            })
+            return JsonResponse({"success": True})
 
         except Exception as e:
             return JsonResponse({

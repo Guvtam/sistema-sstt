@@ -196,21 +196,21 @@
                         <td id="cantidad_aprobado">{{ resumen.cantidad_aprobado }}</td>
                         <td id="aprobado_preventivas">{{ resumen.aprobado_preventivas }}</td>
                         <td id="aprobado_correctivas">{{ resumen.aprobado_correctivas }}</td>
-                        <td id="monto_aprobado">$ {{ resumen.monto_aprobado|intcomma }}</td>
+                        <td id="tabla_monto_aprobado">$ {{ resumen.monto_aprobado|intcomma }}</td>
                     </tr>
                     <tr>
                         <td class="text-warning fw-bold">⏳En Revisión</td>
                         <td id="cantidad_revision">{{ resumen.cantidad_revision }}</td>
                         <td id="revision_preventivas">{{ resumen.revision_preventivas }}</td>
                         <td id="revision_correctivas">{{ resumen.revision_correctivas }}</td>
-                        <td id="monto_revision">$ {{ resumen.monto_revision|intcomma }}</td>
+                        <td id="tabla_monto_revision">$ {{ resumen.monto_revision|intcomma }}</td>
                     </tr>
                     <tr>
                         <td class="text-danger fw-bold">✖ Rechazado</td>
                         <td id="cantidad_rechazado">{{ resumen.cantidad_rechazado }}</td>
                         <td id="rechazado_preventivas">{{ resumen.rechazado_preventivas }}</td>
                         <td id="rechazado_correctivas">{{ resumen.rechazado_correctivas }}</td>
-                        <td id="monto_rechazado">$ {{ resumen.monto_rechazado|intcomma }}</td>
+                        <td id="tabla_monto_rechazado">$ {{ resumen.monto_rechazado|intcomma }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -349,6 +349,7 @@
 
 <script>
 
+
 function guardarEstado(id) {
     const estado = document.getElementById('estado-' + id).value;
 
@@ -358,44 +359,24 @@ function guardarEstado(id) {
             'Content-Type': 'application/x-www-form-urlencoded',
             'X-CSRFToken': '{{ csrf_token }}'
         },
-        body: 'estado_pago=' + estado
+        body: 'estado_pago=' + encodeURIComponent(estado)
     })
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-
-            // feedback visual
-            const btn = document.querySelector(`#estado-${id}`).nextElementSibling;
-            btn.innerText = '✅';
-            setTimeout(() => btn.innerText = '💾', 1500);
-
-            const r = data.resumen;
-
-            // actualizar KPIs
-            document.getElementById('monto_total').innerText =
-                '$ ' + parseFloat(r.monto_total).toLocaleString('es-CL', { maximumFractionDigits: 0 });
-
-            document.getElementById('total_preventivas').innerText =
-                '$ ' + parseFloat(r.monto_preventivas).toLocaleString('es-CL', { maximumFractionDigits: 0 });
-
-            document.getElementById('total_correctivas').innerText =
-                '$ ' + parseFloat(r.monto_correctivas).toLocaleString('es-CL', { maximumFractionDigits: 0 });
-
-            document.getElementById('monto_aprobado').innerText =
-                '$ ' + parseFloat(r.monto_aprobado).toLocaleString('es-CL', { maximumFractionDigits: 0 });
-
-            document.getElementById('monto_revision').innerText =
-                '$ ' + parseFloat(r.monto_revision).toLocaleString('es-CL', { maximumFractionDigits: 0 });
-
-            document.getElementById('monto_rechazado').innerText =
-                '$ ' + parseFloat(r.monto_rechazado).toLocaleString('es-CL', { maximumFractionDigits: 0 });
-
-            document.getElementById('cantidad_aprobado').innerText = r.cantidad_aprobado;
-            document.getElementById('cantidad_revision').innerText = r.cantidad_revision;
-            document.getElementById('cantidad_rechazado').innerText = r.cantidad_rechazado;
+            const url = new URL(window.location.href);
+            url.searchParams.set('_t', Date.now());
+            window.location.href = url.toString();
+        } else {
+            alert('No se pudo actualizar el estado.');
         }
+    })
+    .catch(error => {
+        console.error('Error al guardar estado:', error);
+        alert('Ocurrió un error al guardar el estado.');
     });
 }
+
 
 
 function mostrarEdicion(id) {
@@ -424,42 +405,22 @@ function guardarMonto(id) {
             'X-CSRFToken': '{{ csrf_token }}'
         },
         body: JSON.stringify({
-            valor_pago_tecnico: valor,
-            mes: "{{ mes }}",
-            anio: "{{ anio }}",
-            estado_pago: "{{ estado_pago }}",
-            tipo_servicio: "{{ tipo_servicio }}"
+            valor_pago_tecnico: valor
         })
     })
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-
-            document.getElementById('texto-' + id).innerText =
-                '$ ' + Number(valor || 0).toLocaleString('es-CL');
-
-            cancelarEdicion(id);
-
-            const r = data.resumen;
-
-            document.getElementById('monto_total').innerText =
-                '$ ' + Number(r.monto_total || 0).toLocaleString('es-CL', { maximumFractionDigits: 0 });
-
-            document.getElementById('total_preventivas').innerText =
-                '$ ' + Number(r.monto_preventivas || 0).toLocaleString('es-CL', { maximumFractionDigits: 0 });
-
-            document.getElementById('total_correctivas').innerText =
-                '$ ' + Number(r.monto_correctivas || 0).toLocaleString('es-CL', { maximumFractionDigits: 0 });
-
-            document.getElementById('monto_aprobado').innerText =
-                '$ ' + Number(r.monto_aprobado || 0).toLocaleString('es-CL', { maximumFractionDigits: 0 });
-
-            document.getElementById('monto_revision').innerText =
-                '$ ' + Number(r.monto_revision || 0).toLocaleString('es-CL', { maximumFractionDigits: 0 });
-
-            document.getElementById('monto_rechazado').innerText =
-                '$ ' + Number(r.monto_rechazado || 0).toLocaleString('es-CL', { maximumFractionDigits: 0 });
+            const url = new URL(window.location.href);
+            url.searchParams.set('_t', Date.now());
+            window.location.href = url.toString();
+        } else {
+            alert('No se pudo guardar el monto.');
         }
+    })
+    .catch(error => {
+        console.error('Error al guardar monto:', error);
+        alert('Ocurrió un error al guardar el monto.');
     });
 }
 
