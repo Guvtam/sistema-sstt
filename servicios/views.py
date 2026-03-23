@@ -26,6 +26,11 @@ logger = logging.getLogger(__name__)
 # FUNCIONES AUXILIARES
 # ==============================
 
+def truncar_texto(valor, largo):
+    if valor is None:
+        return None
+    return str(valor).strip()[:largo]
+
 def quitar_tildes(texto):
     if not texto:
         return ""
@@ -763,18 +768,18 @@ def subir_excel(request):
                                 fecha_modificacion=convertir_fecha(row.get("Fecha de modificación")),
                                 fecha_visita=limpiar_fecha(row.get("fecha_visita_convertida")),
                                 fecha_finalizacion=convertir_fecha(row.get("Fecha de finalizacion")),
-                                cuenta=row.get("Cuenta"),
+                                cuenta=truncar_texto(row.get("Cuenta"), 400),
                                 cuenta_contable=cuenta_contable,
                                 es_b2b=es_b2b,
-                                telefono=row.get("Teléfono"),
+                                telefono=truncar_texto(row.get("Teléfono"), 100),
                                 tecnico=nombre_limpio,
                                 tecnico_obj=tecnico_obj,
                                 contratista=contratista_obj,
-                                direccion=row.get("Dirección"),
+                                direccion=truncar_texto(row.get("Dirección"), 300),
                                 provincia_estado=row.get("Provincia-Estado"),
                                 localidad=row.get("Localidad"),
                                 tipo_servicio=row.get("Tipo de Servicio"),
-                                servicio=row.get("Servicio"),
+                                servicio=truncar_texto(row.get("Servicio"), 300),
                                 observaciones=row.get("Observaciones (Insumos)"),
                                 estado=row.get("Estado"),
                                 usuario=row.get("Usuario"),

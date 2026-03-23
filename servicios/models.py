@@ -95,8 +95,8 @@ class ServicioTecnico(models.Model):
     fecha_visita = models.DateTimeField(null=True, blank=True)
     fecha_finalizacion = models.DateTimeField(null=True, blank=True)
 
-    cuenta = models.CharField(max_length=150, null=True, blank=True)
-    telefono = models.CharField(max_length=50, null=True, blank=True)
+    cuenta = models.CharField(max_length=400, null=True, blank=True)
+    telefono = models.CharField(max_length=100, null=True, blank=True)
 
     tecnico = models.CharField(max_length=150, null=True, blank=True)  # respaldo texto
     tecnico_obj = models.ForeignKey(
@@ -107,12 +107,12 @@ class ServicioTecnico(models.Model):
         related_name="servicios"
     )
 
-    direccion = models.CharField(max_length=255, null=True, blank=True)
+    direccion = models.CharField(max_length=300, null=True, blank=True)
     provincia_estado = models.CharField(max_length=150, null=True, blank=True)
     localidad = models.CharField(max_length=150, null=True, blank=True)
 
     tipo_servicio = models.CharField(max_length=150, null=True, blank=True)
-    servicio = models.CharField(max_length=150, null=True, blank=True)
+    servicio = models.CharField(max_length=300, null=True, blank=True)
     observaciones = models.TextField(null=True, blank=True)
     estado = models.CharField(max_length=100, null=True, blank=True)
     usuario = models.CharField(max_length=150, null=True, blank=True)
