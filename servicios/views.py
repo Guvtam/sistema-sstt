@@ -662,6 +662,55 @@ def subir_excel(request):
                         .fillna(0)
                         .astype(int)
                     )
+                    # fecha finalización convertida
+                    if "Fecha de finalizacion" in df.columns:
+                        df["fecha_finalizacion_convertida"] = pd.to_datetime(
+                            df["Fecha de finalizacion"],
+                            errors="coerce",
+                            dayfirst=True
+                        )
+                    else:
+                        df["fecha_finalizacion_convertida"] = pd.NaT
+
+                    # incidencias en los 60 días anteriores por cuenta_contable
+                    # fecha finalización convertida
+                    if "Fecha de finalizacion" in df.columns:
+                        df["fecha_finalizacion_convertida"] = pd.to_datetime(
+                            df["Fecha de finalizacion"],
+                            errors="coerce",
+                            dayfirst=True
+                        )
+                    else:
+                        df["fecha_finalizacion_convertida"] = pd.NaT
+
+                    # usar solo la fecha, sin hora
+                    df["fecha_finalizacion_solo_dia"] = df["fecha_finalizacion_convertida"].dt.date
+
+                    # incidencias en los últimos 60 días por cuenta_contable, incluyendo el día actual
+                    df["numero_incidencias_60_dias"] = 0
+
+                    for cuenta, grupo in df.groupby("cuenta_contable", dropna=False):
+                        grupo = grupo.sort_values("fecha_finalizacion_solo_dia").copy()
+
+                        fechas = grupo["fecha_finalizacion_solo_dia"]
+                        indices = grupo.index.tolist()
+                        resultados = []
+
+                        for fecha_actual in fechas:
+                            if pd.isna(fecha_actual):
+                                resultados.append(0)
+                                continue
+
+                            fecha_inicio = fecha_actual - pd.Timedelta(days=60)
+
+                            cantidad = (
+                                (fechas >= fecha_inicio) &
+                                (fechas <= fecha_actual)
+                            ).sum()
+
+                            resultados.append(int(cantidad))
+
+                        df.loc[indices, "numero_incidencias_60_dias"] = resultados
 
                     # diccionario de contratistas
                     contratistas_db = {}
@@ -790,6 +839,7 @@ def subir_excel(request):
                                 valor_pago_tecnico=valor_pago if pd.notna(valor_pago) else 0,
                                 tiempo_trabajo_total=row.get("Tiempo de Trabajo Total"),
                                 numero_incidencias_dia=int(row.get("numero_incidencias_dia") or 0),
+                                numero_incidencias_60_dias=int(row.get("numero_incidencias_60_dias") or 0),
                             )
                         )
 
@@ -868,16 +918,15 @@ def contratista(request):
     tipo_servicio = request.GET.get("tipo_servicio")
     provincia_estado_sel = request.GET.get("provincia_estado")
 
-    contratistas = Contratista.objects.filter(
-        servicios__isnull=False
-    ).distinct().order_by("nombre")
+    contratistas = Contratista.objects.all().order_by("nombre")
 
     contratista_obj = None
     if contratista_id:
         contratista_obj = Contratista.objects.filter(id=contratista_id).first()
 
     servicios_qs = ServicioTecnico.objects.filter(
-        tecnico_obj__tipo="contratista"
+        Q(tecnico_obj__tipo="contratista") |
+        Q(tecnico_obj__isnull=True, contratista__isnull=False)
     ).select_related("contratista", "tecnico_obj", "carga")
 
     if mes and anio:

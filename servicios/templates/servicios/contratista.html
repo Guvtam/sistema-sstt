@@ -254,7 +254,8 @@
 <th>Observación</th>
 <th>Clasificación</th>
 <th>Monto</th>
-<th>Incidencias</th>
+<th>Incidencias Día</th>
+<th>Incidencias 60 Días</th>
 <th>Estado pago</th>
 </tr>
 </thead>
@@ -336,6 +337,15 @@
             <span class="badge bg-warning text-dark">{{ s.numero_incidencias_dia }}</span>
         {% else %}
             <span class="badge bg-success">{{ s.numero_incidencias_dia }}</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if s.numero_incidencias_60_dias > 2 %}
+            <span class="badge bg-danger">{{ s.numero_incidencias_60_dias }}</span>
+        {% elif s.numero_incidencias_60_dias == 2 %}
+            <span class="badge bg-warning text-dark">{{ s.numero_incidencias_60_dias }}</span>
+        {% else %}
+            <span class="badge bg-success">{{ s.numero_incidencias_60_dias }}</span>
         {% endif %}
     </td>
 

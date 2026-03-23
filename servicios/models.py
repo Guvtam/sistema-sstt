@@ -55,6 +55,28 @@ class Tecnico(models.Model):
 
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        if self.tipo == "contratista":
+            # si no tiene contratista asignado, crearlo automáticamente
+            if not self.contratista:
+                contratista_obj, _ = Contratista.objects.get_or_create(
+                    nombre=self.nombre,
+                    defaults={
+                        "nombre_empresa": self.nombre,
+                    }
+                )
+                self.contratista = contratista_obj
+                super().save(update_fields=["contratista"])
+
+            # actualizar servicios asociados
+            self.servicios.update(contratista=self.contratista)
+
+        else:
+            # si pasa a interno, quitar contratista de sus servicios
+            self.servicios.update(contratista=None)
+
     def __str__(self):
         return f"{self.nombre} ({self.tipo}/{self.categoria})"
 
@@ -127,6 +149,7 @@ class ServicioTecnico(models.Model):
     tiempo_trabajo_total = models.CharField(max_length=100, null=True, blank=True)
     cuenta_contable = models.CharField(max_length=20, null=True, blank=True)
     numero_incidencias_dia = models.IntegerField(default=0)
+    numero_incidencias_60_dias = models.IntegerField(default=0)
 
     estado_pago = models.CharField(
         max_length=20,
