@@ -1,460 +1,443 @@
 {% load humanize %}
-
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-<meta charset="utf-8">
+    <meta charset="utf-8">
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 1cm;
+        }
 
-<style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 9px;
+            color: #1f2937;
+        }
 
-@page {
-    size: A4 landscape;
-    margin: 1.5cm;
-}
+        .header {
+            border-bottom: 2px solid #1f2937;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+        }
 
-body {
-    font-family: Arial, sans-serif;
-    font-size: 10px;
-    color: #1e293b;
-}
+        .header h1 {
+            margin: 0;
+            font-size: 16px;
+        }
 
-/* =========================
-ENCABEZADO
-========================= */
+        .header p {
+            margin: 2px 0 0 0;
+            font-size: 10px;
+            color: #6b7280;
+        }
 
-.header {
-    border-bottom: 2px solid #1e293b;
-    padding-bottom: 10px;
-    margin-bottom: 14px;
-}
+        .box {
+            margin-bottom: 10px;
+        }
 
-.header h1 {
-    font-size: 16px;
-    margin: 0 0 4px 0;
-}
+        .titulo-seccion {
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            color: #374151;
+        }
 
-.header p {
-    margin: 2px 0;
-    color: #475569;
-}
+        .label {
+            display: block;
+            font-size: 7px;
+            color: #7b8794;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 2px;
+        }
 
-.fecha {
-    font-size: 10px;
-    color: #64748b;
-}
+        .right {
+            text-align: right;
+        }
 
-.filtros {
-    margin-top: 6px;
-    font-size: 10px;
-    color: #334155;
-}
+        /* FILTROS */
+        .filtros-table,
+        .resumen-table,
+        .totales-table,
+        .servicios-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
 
-/* =========================
-DATOS CONTRATISTA
-========================= */
+        .filtros-table td,
+        .totales-table td {
+            border: 1px solid #d1d5db;
+            padding: 6px 8px;
+            vertical-align: top;
+        }
 
-.contratista-box {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    padding: 10px;
-    margin-bottom: 14px;
-}
+        /* BLOQUE CONTRATISTA MÁS COMPACTO */
+        .contratista-card {
+            border: 1px solid #d8dee6;
+            background: #ffffff;
+            padding: 0;
+            margin-top: 2px;
+        }
 
-.contratista-box table {
-    width: 100%;
-    border-collapse: collapse;
-}
+        .contratista-header {
+            background: #eef3f8;
+            border-bottom: 1px solid #d8dee6;
+            padding: 5px 8px;
+        }
 
-.contratista-box td {
-    padding: 4px 10px;
-    font-size: 10px;
-}
+        .contratista-nombre {
+            font-size: 13px;
+            font-weight: bold;
+            color: #1f2937;
+            margin: 0 0 1px 0;
+            line-height: 1.2;
+        }
 
-.contratista-box strong {
-    color: #64748b;
-    font-size: 9px;
-    text-transform: uppercase;
-    display: block;
-}
+        .contratista-sub {
+            font-size: 8px;
+            color: #6b7280;
+            margin: 0;
+            line-height: 1.2;
+        }
 
-/* =========================
-RESUMEN
-========================= */
+        .contratista-grid {
+            padding: 4px 8px 2px 8px;
+        }
 
-.resumen-box {
-    margin-bottom: 16px;
-}
+        .contratista-row {
+            width: 100%;
+            margin-bottom: 1px;
+            border-collapse: collapse;
+        }
 
-.resumen-box h3 {
-    font-size: 11px;
-    color: #64748b;
-    text-transform: uppercase;
-    margin-bottom: 6px;
-}
+        .contratista-row td {
+            width: 50%;
+            vertical-align: top;
+            padding: 0 8px 2px 0;
+        }
 
-.resumen-table {
-    width: 320px;
-    border-collapse: collapse;
-    font-size: 10px;
-}
+        .contratista-item {
+            padding-bottom: 1px;
+            border-bottom: 1px solid #eef2f7;
+        }
 
-.resumen-table th {
-    background: #1e293b;
-    color: white;
-    padding: 5px 12px;
-    text-align: left;
-}
+        .contratista-item .valor {
+            font-size: 8px;
+            color: #111827;
+            line-height: 1.2;
+            word-break: break-word;
+        }
 
-.resumen-table th.right {
-    text-align: right;
-}
+        /* TABLAS RESUMEN */
+        .resumen-table th,
+        .totales-table th,
+        .servicios-table th {
+            background: #1f2937;
+            color: #ffffff;
+            padding: 6px;
+            border: 1px solid #111827;
+            font-size: 9px;
+        }
 
-.resumen-table td {
-    padding: 5px 12px;
-    border-bottom: 1px solid #e2e8f0;
-}
+        .resumen-table td,
+        .totales-table td {
+            padding: 6px 8px;
+            border: 1px solid #d1d5db;
+            font-size: 9px;
+        }
 
-.resumen-table td.right {
-    text-align: right;
-}
+        .total-row {
+            background: #f3f4f6;
+            font-weight: bold;
+        }
 
-.preventiva td {
-    color: #16a34a;
-}
+        .iva-row {
+            background: #e0f2fe;
+            font-weight: bold;
+        }
 
-.correctiva td {
-    color: #d97706;
-}
+        /* TABLA SERVICIOS */
+        .servicios-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
 
-.total td {
-    font-weight: bold;
-    background: #f1f5f9;
-}
+        .servicios-table th,
+        .servicios-table td {
+            border: 1px solid #d1d5db;
+            padding: 5px 6px;
+            font-size: 8px;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
 
-/* =========================
-TABLA SERVICIOS
-========================= */
+        .servicios-table tr:nth-child(even) {
+            background: #f9fafb;
+        }
 
-.servicios-title {
-    font-size: 11px;
-    color: #64748b;
-    text-transform: uppercase;
-    margin-bottom: 6px;
-}
+        .monto {
+            text-align: right;
+            white-space: nowrap;
+        }
 
-table.servicios {
-    width: 100%;
-    border-collapse: collapse;
-    
-}
+        .obs {
+            white-space: normal;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.45;
+        }
 
-table.servicios th {
-    background: #1e293b;
-    color: white;
-    padding: 5px 6px;
-    font-size: 9px;
-    text-align: left;
-}
-
-table.servicios td {
-    padding: 4px 6px;
-    border-bottom: 1px solid #e2e8f0;
-    font-size: 9px;
-    vertical-align: top;
-}
-
-table.servicios tr:nth-child(even) td {
-    background: #f8fafc;
-}
-
-.obs {
-    white-space: normal;
-    word-wrap: break-word;
-    word-break: break-word;
-}
-
-.monto {
-    text-align: right;
-    white-space: nowrap;
-}
-
-.badge-verde {
-    color: #16a34a;
-    font-weight: bold;
-}
-
-.badge-amarillo {
-    color: #d97706;
-    font-weight: bold;
-}
-
-.badge-rojo {
-    color: #dc2626;
-    font-weight: bold;
-}
-
-/* evitar que filas se corten */
-
-tr {
-    page-break-inside: avoid;
-}
-
-/* limitar columnas que crecen mucho */
-
-.servicios td:nth-child(4),
-.servicios th:nth-child(4) {
-    width: 14%;
-}
-
-.servicios td:nth-child(7),
-.servicios th:nth-child(7) {
-    width: 10%;
-}
-
-/* hacer observaciones realmente grande */
-
-.servicios td:nth-child(8),
-.servicios th:nth-child(8) {
-    width: 35%;
-}
-
-.servicios td {
-    word-break: break-word;
-    white-space: normal;
-}
-
-.servicios td:nth-child(4) {
-    font-size:8px;
-}
-</style>
-
+        /* ANCHOS TABLA DETALLE */
+        .w-numero   { width: 5%; }
+        .w-fecha    { width: 8%; }
+        .w-cuenta   { width: 11%; }
+        .w-contable { width: 7%; }
+        .w-prov     { width: 6%; }
+        .w-tipo     { width: 5%; }
+        .w-servicio { width: 7%; }
+        .w-obs      { width: 41%; }
+        .w-monto    { width: 10%; }
+    </style>
 </head>
-
 <body>
 
-<!-- =========================
-ENCABEZADO
-========================= -->
-
-<div class="header">
-
-    <h1>Reporte de Servicios Técnicos</h1>
-    <p>Sistema de Gestión de Pagos</p>
-
-    <div class="fecha">
-        Generado el {% now "d/m/Y H:i" %}
+    <div class="header">
+        <h1>Reporte de Servicios Técnicos por Contratista</h1>
+        <p>Reporte generado desde el sistema SSTT</p>
     </div>
 
-    <div class="filtros">
-
-        <strong>Periodo:</strong>
-        {{ mes|default:"Todos" }}/{{ anio|default:"Todos" }}
-
-        &nbsp;&nbsp; | &nbsp;&nbsp;
-
-        <strong>Estado de Pago:</strong>
-        {{ estado_pago|default:"Todos" }}
-
+    <div class="box">
+        <div class="titulo-seccion">Filtros aplicados</div>
+        <table class="filtros-table">
+            <tr>
+                <td>
+                    <span class="label">Mes</span>
+                    {{ mes|default:"Todos" }}
+                </td>
+                <td>
+                    <span class="label">Año</span>
+                    {{ anio|default:"Todos" }}
+                </td>
+                <td>
+                    <span class="label">Estado pago</span>
+                    {{ estado_pago|default:"Todos" }}
+                </td>
+                <td>
+                    <span class="label">Tipo servicio</span>
+                    {% if tipo_servicio == "PREVENTIV" %}
+                        Preventivas
+                    {% elif tipo_servicio == "CORRECTIV" %}
+                        Correctivas
+                    {% else %}
+                        Todos
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="label">Provincia / Estado</span>
+                    {{ provincia_estado|default:"Todos" }}
+                </td>
+            </tr>
+        </table>
     </div>
 
-</div>
+    {% if contratista %}
+    <div class="box">
+        <div class="titulo-seccion">Datos del contratista</div>
 
-<!-- =========================
-DATOS CONTRATISTA
-========================= -->
+        <div class="contratista-card">
+            <div class="contratista-header">
+                <div class="contratista-nombre">{{ contratista.nombre|default:"-" }}</div>
+                <div class="contratista-sub">
+                    {{ contratista.nombre_empresa|default:"Sin empresa registrada" }}
+                </div>
+            </div>
 
-{% if contratista %}
+            <div class="contratista-grid">
+                <table class="contratista-row">
+                    <tr>
+                        <td>
+                            <div class="contratista-item">
+                                <span class="label">RUT</span>
+                                <div class="valor">{{ contratista.rut|default:"-" }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="contratista-item">
+                                <span class="label">Ciudad</span>
+                                <div class="valor">{{ contratista.ciudad|default:"-" }}</div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
 
-<div class="contratista-box">
+                <table class="contratista-row">
+                    <tr>
+                        <td>
+                            <div class="contratista-item">
+                                <span class="label">Correo</span>
+                                <div class="valor">{{ contratista.correo|default:"-" }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="contratista-item">
+                                <span class="label">Fono</span>
+                                <div class="valor">{{ contratista.fono|default:"-" }}</div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
 
-<table>
+                <table class="contratista-row">
+                    <tr>
+                        <td>
+                            <div class="contratista-item">
+                                <span class="label">Banco</span>
+                                <div class="valor">{{ contratista.banco|default:"-" }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="contratista-item">
+                                <span class="label">Tipo de cuenta</span>
+                                <div class="valor">{{ contratista.tipo_cuenta|default:"-" }}</div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
 
-<tr>
+                <table class="contratista-row" style="margin-bottom:0;">
+                    <tr>
+                        <td>
+                            <div class="contratista-item">
+                                <span class="label">Número de cuenta</span>
+                                <div class="valor">{{ contratista.numero_cuenta|default:"-" }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="contratista-item">
+                                <span class="label">Categoría</span>
+                                <div class="valor">{{ contratista.categoria|default:"-" }}</div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
-<td>
-<strong>Contratista</strong>
-{{ contratista.nombre }}
-</td>
+    <div class="box">
+        <div class="titulo-seccion">Resumen de pago</div>
+        <table class="resumen-table">
+            <thead>
+                <tr>
+                    <th>Concepto</th>
+                    <th class="right">Cantidad</th>
+                    <th class="right">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="total-row">
+                    <td>Total mantenciones</td>
+                    <td class="right">{{ resumen.total_mantenciones|default:0 }}</td>
+                    <td class="right">${{ resumen.monto_total|default:0|floatformat:0|intcomma }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 
-<td>
-<strong>RUT</strong>
-{{ contratista.rut }}
-</td>
+    <div class="box">
+        <div class="titulo-seccion">Resumen B2B / B2C</div>
+        <table class="resumen-table">
+            <thead>
+                <tr>
+                    <th>Concepto</th>
+                    <th class="right">Cantidad</th>
+                    <th class="right">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>B2B</td>
+                    <td class="right">{{ resumen.total_b2b|default:0 }}</td>
+                    <td class="right">${{ resumen.monto_b2b|default:0|floatformat:0|intcomma }}</td>
+                </tr>
+                <tr>
+                    <td>B2C</td>
+                    <td class="right">{{ resumen.total_b2c|default:0 }}</td>
+                    <td class="right">${{ resumen.monto_b2c|default:0|floatformat:0|intcomma }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 
-<td>
-<strong>Empresa</strong>
-{{ contratista.nombre_empresa }}
-</td>
+    <div class="box">
+        <div class="titulo-seccion">Cálculo total con IVA</div>
+        <table class="totales-table">
+            <thead>
+                <tr>
+                    <th>Concepto</th>
+                    <th class="right">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Total neto</td>
+                    <td class="right">${{ resumen.monto_total|default:0|floatformat:0|intcomma }}</td>
+                </tr>
+                <tr>
+                    <td>IVA 19%</td>
+                    <td class="right">${{ resumen.iva_19|default:0|floatformat:0|intcomma }}</td>
+                </tr>
+                <tr class="iva-row">
+                    <td>Total con IVA</td>
+                    <td class="right">${{ resumen.monto_total_con_iva|default:0|floatformat:0|intcomma }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 
-<td>
-<strong>Ciudad</strong>
-{{ contratista.ciudad }}
-</td>
-
-<td>
-<strong>Correo</strong>
-{{ contratista.correo }}
-</td>
-
-<td>
-<strong>Fono</strong>
-{{ contratista.fono }}
-</td>
-
-</tr>
-
-</table>
-
-</div>
-
-{% endif %}
-
-<!-- =========================
-RESUMEN
-========================= -->
-
-<div class="resumen-box">
-
-<h3>Resumen</h3>
-
-<table class="resumen-table">
-
-<thead>
-
-<tr>
-<th>Tipo</th>
-<th class="right">Cantidad</th>
-<th class="right">Monto</th>
-</tr>
-
-</thead>
-
-<tbody>
-
-<tr class="preventiva">
-<td>Preventivas</td>
-<td class="right">{{ resumen.total_preventivas }}</td>
-<td class="right">${{ resumen.monto_preventivas|floatformat:0|intcomma }}</td>
-</tr>
-
-<tr class="correctiva">
-<td>Correctivas</td>
-<td class="right">{{ resumen.total_correctivas }}</td>
-<td class="right">${{ resumen.monto_correctivas|floatformat:0|intcomma }}</td>
-</tr>
-
-<tr class="total">
-<td>Total</td>
-<td class="right">{{ resumen.total_mantenciones }}</td>
-<td class="right">${{ resumen.monto_total|floatformat:0|intcomma }}</td>
-</tr>
-
-</tbody>
-
-</table>
-
-</div>
-
-<!-- =========================
-TABLA SERVICIOS
-========================= -->
-
-<p class="servicios-title">
-Detalle de Servicios ({{ servicios|length }})
-</p>
-
-<table class="servicios">
-
-<colgroup>
-<col style="width:5%">
-<col style="width:8%">
-<col style="width:6%">
-<col style="width:10%">
-<col style="width:10%">
-<col style="width:8%">
-<col style="width:8%">
-<col style="width:35%">   <!-- OBSERVACIONES -->
-<col style="width:8%">
-<col style="width:2%">
-</colgroup>
-
-<thead>
-
-<tr>
-
-<th>Número</th>
-<th>Fecha Finalización</th>
-<th>Cuenta First</th>
-<th>Nombre Cuenta</th>
-<th>Provincia - Estado</th>
-<th>Tipo Servicio</th>
-<th>Servicio</th>
-<th>Observaciones</th>
-<th>Valor Pago</th>
-<th>Incidencias</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-{% for s in servicios %}
-
-<tr>
-
-<td>{{ s.numero }}</td>
-
-<td>{{ s.fecha_finalizacion|date:"d/m/Y H:i" }}</td>
-
-<td>{{ s.cuenta_contable }}</td>
-
-<td>{{ s.cuenta }}</td>
-
-<td>{{ s.provincia_estado }}</td>
-
-<td>{{ s.tipo_servicio }}</td>
-
-<td>{{ s.servicio }}</td>
-
-<td class="obs">{{ s.observaciones }}</td>
-
-<td class="monto">
-${{ s.valor_pago_tecnico|floatformat:0|intcomma }}
-</td>
-
-<td>
-
-{% if s.numero_incidencias_dia > 2 %}
-
-<span class="badge-rojo">
-{{ s.numero_incidencias_dia }}
-</span>
-
-{% elif s.numero_incidencias_dia == 2 %}
-
-<span class="badge-amarillo">
-{{ s.numero_incidencias_dia }}
-</span>
-
-{% else %}
-
-<span class="badge-verde">
-{{ s.numero_incidencias_dia }}
-</span>
-
-{% endif %}
-
-</td>
-
-</tr>
-
-{% endfor %}
-
-</tbody>
-
-</table>
+    <div class="box">
+        <div class="titulo-seccion">Detalle de servicios</div>
+        <table class="servicios-table">
+            <thead>
+                <tr>
+                    <th class="w-numero">N°</th>
+                    <th class="w-fecha">Fecha finalización</th>
+                    <th class="w-cuenta">Cuenta</th>
+                    <th class="w-contable">Cuenta contable</th>
+                    <th class="w-prov">Provincia / Estado</th>
+                    <th class="w-tipo">Tipo</th>
+                    <th class="w-servicio">Servicio</th>
+                    <th class="w-obs">Observaciones</th>
+                    <th class="w-monto right">Valor pago técnico</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in servicios %}
+                <tr>
+                    <td>{{ s.numero|default:"-" }}</td>
+                    <td>{{ s.fecha_finalizacion|date:"d/m/Y H:i"|default:"-" }}</td>
+                    <td>{{ s.cuenta|default:"-" }}</td>
+                    <td>{{ s.cuenta_contable|default:"-" }}</td>
+                    <td>{{ s.provincia_estado|default:"-" }}</td>
+                    <td>{{ s.tipo_servicio|default:"-" }}</td>
+                    <td>{{ s.servicio|default:"-" }}</td>
+                    <td class="obs">{{ s.observaciones|default:"-" }}</td>
+                    <td class="monto">${{ s.valor_pago_tecnico|default:0|floatformat:0|intcomma }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" style="text-align:center;">No hay servicios para los filtros seleccionados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
 </body>
 </html>

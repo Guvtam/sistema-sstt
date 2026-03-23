@@ -7,7 +7,7 @@
 <h2 class="mb-4 text-center">Servicios Técnicos por Contratista</h2>
 
 <div class="text-end">
-    <a href="{% url 'contratista_pdf' %}?contratista_id={{ contratista.id }}&mes={{ mes }}&anio={{ anio }}&estado_pago={{ estado_pago }}"
+    <a href="{% url 'contratista_pdf' %}?contratista_id={{ contratista_id }}&mes={{ mes }}&anio={{ anio }}&estado_pago={{ estado_pago }}&tipo_servicio={{ tipo_servicio }}&provincia_estado={{ provincia_estado_sel }}"
        target="_blank"
        class="btn btn-danger">
         Exportar PDF
@@ -84,8 +84,10 @@
         </select>
     </div>
 
-    <div class="col-md-2">
-        <a href="{% url 'contratista' %}" class="btn btn-warning">Limpiar</a>
+    <div class="col-12 text-center mt-3">
+        <a href="{% url 'contratista' %}" class="btn btn-warning px-4">
+            🔄 Limpiar filtros
+        </a>
     </div>
 </form>
 
@@ -97,7 +99,7 @@
 
         <!-- IZQUIERDA -->
         <div class="col-md-4 d-flex flex-column">
-            <div class="kpi-card mb-3 text-center">
+            <div class="kpi-card mb-4 text-center">
                 <div class="kpi-title">Contratista</div>
                 <div class="kpi-value">
                     {% if contratista %}{{ contratista.nombre_empresa }}{% else %}Todos{% endif %}
@@ -138,6 +140,10 @@
                         <div class="kpi-value" id="total_preventivas">
                             ${{ resumen.monto_preventivas|default:0|intcomma }}
                         </div>
+                        <div class="small text-muted mt-2">Aprobado</div>
+                        <div class="kpi-value text-success" id="aprobado_preventivas_monto">
+                            ${{ resumen.monto_aprobado_preventivas|default:0|floatformat:0|intcomma }}
+                        </div>
                     </div>
                 </div>
 
@@ -148,6 +154,10 @@
                         <div class="small text-muted">Monto</div>
                         <div class="kpi-value" id="total_correctivas">
                             ${{ resumen.monto_correctivas|default:0|intcomma }}
+                        </div>
+                        <div class="small text-muted mt-2">Aprobado</div>
+                        <div class="kpi-value text-success" id="aprobado_correctivas_monto">
+                            ${{ resumen.monto_aprobado_correctivas|default:0|floatformat:0|intcomma }}
                         </div>
                     </div>
                 </div>
@@ -160,6 +170,10 @@
                         <div class="kpi-value">
                             ${{ resumen.monto_b2b|default:0|intcomma }}
                         </div>
+                        <div class="small text-muted mt-2">Aprobado</div>
+                        <div class="kpi-value text-success">
+                            ${{ resumen.monto_aprobado_b2b|default:0|floatformat:0|intcomma }}
+                        </div>
                     </div>
                 </div>
 
@@ -171,6 +185,10 @@
                         <div class="small text-muted">Monto</div>
                         <div class="kpi-value">
                             ${{ resumen.monto_b2c|default:0|intcomma }}
+                        </div>
+                        <div class="small text-muted mt-2">Aprobado</div>
+                        <div class="kpi-value text-success">
+                            ${{ resumen.monto_aprobado_b2c|default:0|floatformat:0|intcomma }}
                         </div>
                     </div>
                 </div>

@@ -201,6 +201,9 @@ def limpiar_fecha(valor):
     return None
 
 
+
+
+
 def obtener_resumen_contratista(servicios):
     numeros_totales = {s.numero for s in servicios if s.numero is not None}
 
@@ -287,25 +290,28 @@ def obtener_resumen_contratista(servicios):
         if s.numero is not None and not s.es_b2b
     }
 
-    monto_total = sum(s.valor_pago_tecnico or 0 for s in servicios)
-    monto_aprobado = sum((s.valor_pago_tecnico or 0) for s in servicios if s.estado_pago == "aprobado")
-    monto_revision = sum((s.valor_pago_tecnico or 0) for s in servicios if s.estado_pago == "revision")
-    monto_rechazado = sum((s.valor_pago_tecnico or 0) for s in servicios if s.estado_pago == "rechazado")
+    monto_total = Decimal(sum(Decimal(s.valor_pago_tecnico or 0) for s in servicios))
+    monto_aprobado = Decimal(sum(Decimal(s.valor_pago_tecnico or 0) for s in servicios if s.estado_pago == "aprobado"))
+    monto_revision = Decimal(sum(Decimal(s.valor_pago_tecnico or 0) for s in servicios if s.estado_pago == "revision"))
+    monto_rechazado = Decimal(sum(Decimal(s.valor_pago_tecnico or 0) for s in servicios if s.estado_pago == "rechazado"))
 
-    monto_preventivas = sum(
-        s.valor_pago_tecnico or 0
+    monto_preventivas = Decimal(sum(
+        Decimal(s.valor_pago_tecnico or 0)
         for s in servicios
         if s.tipo_servicio and "PREVENTIV" in s.tipo_servicio.upper()
-    )
+    ))
 
-    monto_correctivas = sum(
-        s.valor_pago_tecnico or 0
+    monto_correctivas = Decimal(sum(
+        Decimal(s.valor_pago_tecnico or 0)
         for s in servicios
         if s.tipo_servicio and "CORRECTIV" in s.tipo_servicio.upper()
-    )
+    ))
 
-    monto_b2b = sum(s.valor_pago_tecnico or 0 for s in servicios if s.es_b2b)
-    monto_b2c = sum(s.valor_pago_tecnico or 0 for s in servicios if not s.es_b2b)
+    monto_b2b = Decimal(sum(Decimal(s.valor_pago_tecnico or 0) for s in servicios if s.es_b2b))
+    monto_b2c = Decimal(sum(Decimal(s.valor_pago_tecnico or 0) for s in servicios if not s.es_b2b))
+
+    iva_19 = monto_total * Decimal("0.19")
+    monto_total_con_iva = monto_total + iva_19
 
     return {
         "total_mantenciones": len(numeros_totales),
@@ -330,6 +336,8 @@ def obtener_resumen_contratista(servicios):
         "total_b2c": len(numeros_b2c),
         "monto_b2b": monto_b2b,
         "monto_b2c": monto_b2c,
+        "iva_19": iva_19,
+        "monto_total_con_iva": monto_total_con_iva,
     }
 
 
@@ -443,8 +451,13 @@ def internos(request):
 
     resumen = servicios.aggregate(
         total=Count("numero", distinct=True),
+
         preventivos=Count("numero", distinct=True, filter=Q(tipo_servicio__icontains="PREVENTIV")),
         correctivos=Count("numero", distinct=True, filter=Q(tipo_servicio__icontains="CORRECTIV")),
+
+        total_b2b=Count("numero", distinct=True, filter=Q(es_b2b=True)),
+        total_b2c=Count("numero", distinct=True, filter=Q(es_b2b=False)),
+
         costo_preventivas=Coalesce(
             Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="PREVENTIV")),
             Value(0)
@@ -453,19 +466,40 @@ def internos(request):
             Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="CORRECTIV")),
             Value(0)
         ),
+
+        costo_b2b=Coalesce(
+            Sum("valor_pago_tecnico", filter=Q(es_b2b=True)),
+            Value(0)
+        ),
+        costo_b2c=Coalesce(
+            Sum("valor_pago_tecnico", filter=Q(es_b2b=False)),
+            Value(0)
+        ),
+
         costo_total=Coalesce(Sum("valor_pago_tecnico"), Value(0))
     )
 
     resumen_tecnicos = servicios.values("tecnico").annotate(
         total=Count("numero", distinct=True),
-        preventivas=Count("numero", distinct=True, filter=Q(tipo_servicio__icontains="PREVENTIV")),
-        correctivas=Count("numero", distinct=True, filter=Q(tipo_servicio__icontains="CORRECTIV")),
+
+        b2b=Count("numero", distinct=True, filter=Q(es_b2b=True)),
+        b2c=Count("numero", distinct=True, filter=Q(es_b2b=False)),
+
+        costo_b2b=Coalesce(
+            Sum("valor_pago_tecnico", filter=Q(es_b2b=True)),
+            Value(0)
+        ),
+        costo_b2c=Coalesce(
+            Sum("valor_pago_tecnico", filter=Q(es_b2b=False)),
+            Value(0)
+        ),
+
         costo_total=Coalesce(Sum("valor_pago_tecnico"), Value(0))
     ).exclude(
         tecnico__isnull=True
     ).exclude(
         tecnico=""
-    ).order_by("-total")
+    ).order_by("-costo_total")
 
     servicios_principales = [
         "ServicioViña",
@@ -1077,16 +1111,21 @@ def contratista_pdf(request):
             "estado_pago": estado_pago,
             "mes": mes,
             "anio": anio,
+            "tipo_servicio": tipo_servicio,
+            "provincia_estado": provincia_estado_sel,
+            "contratista_id": contratista_id,
         }
     )
 
     buffer = BytesIO()
-    pisa.CreatePDF(html_string, dest=buffer)
+    pisa_status = pisa.CreatePDF(html_string, dest=buffer)
     buffer.seek(0)
 
-    response = HttpResponse(buffer, content_type="application/pdf")
-    response["Content-Disposition"] = 'inline; filename="reporte_contratista.pdf"'
+    if pisa_status.err:
+        return HttpResponse("Error al generar PDF", status=500)
 
+    response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+    response["Content-Disposition"] = 'inline; filename="reporte_contratista.pdf"'
     return response
 
 
