@@ -15,7 +15,7 @@
     <div class="row mb-3 justify-content-center">
 
         <div class="col-md-2">
-            <select name="mes" class="form-select" onchange="this.form.submit()">
+            <select name="mes" class="form-select" >
                 <option value="">Todos los meses</option>
                 {% for m in meses_disponibles %}
                     <option value="{{ m }}" {% if mes == m|stringformat:"s" %}selected{% endif %}>
@@ -39,7 +39,7 @@
         </div>
 
         <div class="col-md-2">
-            <select name="anio" class="form-select" onchange="this.form.submit()">
+            <select name="anio" class="form-select" >
                 <option value="">Todos los años</option>
                 {% for a in anios_disponibles %}
                     <option value="{{ a }}" {% if anio == a|stringformat:"s" %}selected{% endif %}>

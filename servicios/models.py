@@ -104,6 +104,7 @@ class ServicioTecnico(models.Model):
         ("aprobado", "Aprobado"),
         ("revision", "En Revisión"),
         ("rechazado", "Rechazado"),
+        ("no_cobrado","No Cobrado")
     ]
 
     carga = models.ForeignKey(

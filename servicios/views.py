@@ -294,6 +294,30 @@ def obtener_resumen_contratista(servicios):
         s.numero for s in servicios
         if s.numero is not None and not s.es_b2b
     }
+    numeros_no_cobrado = {
+        s.numero for s in servicios
+        if s.numero is not None and s.estado_pago == "no_cobrado"
+    }
+    numeros_no_cobrado_preventivas = {
+        s.numero for s in servicios
+        if s.numero is not None
+        and s.estado_pago == "no_cobrado"
+        and s.tipo_servicio
+        and "PREVENTIV" in s.tipo_servicio.upper()
+    }
+    numeros_no_cobrado_correctivas = {
+        s.numero for s in servicios
+        if s.numero is not None
+        and s.estado_pago == "no_cobrado"
+        and s.tipo_servicio
+        and "CORRECTIV" in s.tipo_servicio.upper()
+    }
+    monto_no_cobrado = Decimal(sum(
+        Decimal(s.valor_pago_tecnico or 0)
+        for s in servicios if s.estado_pago == "no_cobrado"
+    ))
+
+    
 
     monto_total = Decimal(sum(Decimal(s.valor_pago_tecnico or 0) for s in servicios))
     monto_aprobado = Decimal(sum(Decimal(s.valor_pago_tecnico or 0) for s in servicios if s.estado_pago == "aprobado"))
@@ -343,6 +367,10 @@ def obtener_resumen_contratista(servicios):
         "monto_b2c": monto_b2c,
         "iva_19": iva_19,
         "monto_total_con_iva": monto_total_con_iva,
+        "cantidad_no_cobrado": len(numeros_no_cobrado),
+        "monto_no_cobrado": monto_no_cobrado,
+        "no_cobrado_preventivas": len(numeros_no_cobrado_preventivas),
+        "no_cobrado_correctivas": len(numeros_no_cobrado_correctivas),
     }
 
 
@@ -402,6 +430,21 @@ def obtener_resumen_estado_qs(servicios):
             "numero",
             distinct=True,
             filter=Q(estado_pago="rechazado", tipo_servicio__icontains="CORRECTIV")
+        ),
+        monto_no_cobrado=Coalesce(
+            Sum("valor_pago_tecnico", filter=Q(estado_pago="no_cobrado")),
+            Value(0)
+        ),
+        cantidad_no_cobrado=Count("numero", distinct=True, filter=Q(estado_pago="no_cobrado")),
+        no_cobrado_preventivas=Count(
+            "numero",
+            distinct=True,
+            filter=Q(estado_pago="no_cobrado", tipo_servicio__icontains="PREVENTIV")
+        ),
+        no_cobrado_correctivas=Count(
+            "numero",
+            distinct=True,
+            filter=Q(estado_pago="no_cobrado", tipo_servicio__icontains="CORRECTIV")
         ),
     )
 
@@ -885,11 +928,10 @@ def buscador_servicios(request):
     provincia_estado_sel = request.GET.get("provincia_estado")
     tecnico_sel = request.GET.get("tecnico")
 
-    if not mes or not anio:
-        ultima_carga = CargaMensual.objects.order_by("-anio", "-mes").first()
-        if ultima_carga:
-            mes = str(ultima_carga.mes)
-            anio = str(ultima_carga.anio)
+    if mes and anio:
+        servicios = servicios.filter(carga__mes=mes, carga__anio=anio)
+    elif carga_id:
+        servicios = servicios.filter(carga_id=carga_id)
 
     servicios = ServicioTecnico.objects.all().select_related(
         "contratista", "tecnico_obj", "carga"

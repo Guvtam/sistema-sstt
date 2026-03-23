@@ -88,6 +88,7 @@
             <option value="aprobado" {% if estado_pago == "aprobado" %}selected{% endif %}>Aprobados</option>
             <option value="revision" {% if estado_pago == "revision" %}selected{% endif %}>Revisión</option>
             <option value="rechazado" {% if estado_pago == "rechazado" %}selected{% endif %}>Rechazados</option>
+            <option value="no_cobrado" {% if estado_pago == "no_cobrado" %}selected{% endif %}>No Cobrado</option>
         </select>
     </div>
 
@@ -237,6 +238,13 @@
                         <td id="rechazado_correctivas">{{ resumen.rechazado_correctivas }}</td>
                         <td id="tabla_monto_rechazado">$ {{ resumen.monto_rechazado|intcomma }}</td>
                     </tr>
+                    <tr>
+                        <td class="text-secondary fw-bold">— No Cobrado</td>
+                        <td id="cantidad_no_cobrado">{{ resumen.cantidad_no_cobrado }}</td>
+                        <td id="no_cobrado_preventivas">{{ resumen.no_cobrado_preventivas }}</td>
+                        <td id="no_cobrado_correctivas">{{ resumen.no_cobrado_correctivas }}</td>
+                        <td id="tabla_monto_no_cobrado">$ {{ resumen.monto_no_cobrado|intcomma }}</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -346,6 +354,7 @@
             <span class="badge bg-success">{{ s.numero_incidencias_dia }}</span>
         {% endif %}
     </td>
+    <!-- 🚨 INCIDENCIAS -->
     <td>
         {% if s.numero_incidencias_60_dias > 2 %}
             <span class="badge bg-danger">{{ s.numero_incidencias_60_dias }}</span>
