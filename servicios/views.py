@@ -425,6 +425,19 @@ def internos(request):
     mes = request.GET.get("mes")
     anio = request.GET.get("anio")
     tipo_servicio = request.GET.get("tipo_servicio")
+    anios_disponibles = (
+        CargaMensual.objects.exclude(anio__isnull=True)
+        .values_list("anio", flat=True)
+        .distinct()
+        .order_by("-anio")
+    )
+
+    meses_disponibles = (
+        CargaMensual.objects.exclude(mes__isnull=True)
+        .values_list("mes", flat=True)
+        .distinct()
+        .order_by("mes")
+    )
 
     servicios = ServicioTecnico.objects.filter(
         tecnico_obj__tipo="interno"
@@ -534,6 +547,8 @@ def internos(request):
         "tipo_servicio": tipo_servicio,
         "mes": mes,
         "anio": anio,
+        "anios_disponibles": anios_disponibles,
+        "meses_disponibles": meses_disponibles,
     })
 
 
@@ -865,6 +880,10 @@ def buscador_servicios(request):
     carga_id = request.GET.get("carga")
     mes = request.GET.get("mes")
     anio = request.GET.get("anio")
+    contratista_id = request.GET.get("contratista_id")
+    tipo_servicio = request.GET.get("tipo_servicio")
+    provincia_estado_sel = request.GET.get("provincia_estado")
+    tecnico_sel = request.GET.get("tecnico")
 
     if not mes or not anio:
         ultima_carga = CargaMensual.objects.order_by("-anio", "-mes").first()
@@ -881,6 +900,32 @@ def buscador_servicios(request):
     elif carga_id:
         servicios = servicios.filter(carga_id=carga_id)
 
+    if contratista_id:
+        servicios = servicios.filter(contratista_id=contratista_id)
+
+    if tipo_servicio:
+        servicios = servicios.filter(tipo_servicio__icontains=tipo_servicio)
+
+    if tecnico_sel:
+        servicios = servicios.filter(tecnico=tecnico_sel)
+
+    if provincia_estado_sel:
+        valor = provincia_estado_sel.strip().upper()
+        servicios_filtrados = []
+
+        for s in servicios:
+            dato = str(s.provincia_estado).strip().upper() if s.provincia_estado else ""
+
+            if valor == "NAN":
+                if dato == "NAN" or dato == "":
+                    servicios_filtrados.append(s)
+            else:
+                if dato == valor:
+                    servicios_filtrados.append(s)
+
+        servicios_ids = [s.id for s in servicios_filtrados]
+        servicios = servicios.filter(id__in=servicios_ids)
+
     if query:
         servicios = servicios.filter(
             Q(numero__icontains=query) |
@@ -893,6 +938,41 @@ def buscador_servicios(request):
 
     cargas = CargaMensual.objects.all().order_by("-fecha_carga")
 
+    anios_disponibles = (
+        CargaMensual.objects.exclude(anio__isnull=True)
+        .values_list("anio", flat=True)
+        .distinct()
+        .order_by("-anio")
+    )
+
+    meses_disponibles = (
+        CargaMensual.objects.exclude(mes__isnull=True)
+        .values_list("mes", flat=True)
+        .distinct()
+        .order_by("mes")
+    )
+
+    contratistas = Contratista.objects.all().order_by("nombre")
+
+    tecnicos = ServicioTecnico.objects.exclude(
+        tecnico__isnull=True
+    ).exclude(
+        tecnico=""
+    ).values_list(
+        "tecnico", flat=True
+    ).distinct().order_by("tecnico")
+
+    provincias_qs = ServicioTecnico.objects.values_list("provincia_estado", flat=True)
+    provincias_set = set()
+
+    for p in provincias_qs:
+        dato = str(p).strip().upper() if p else "NAN"
+        if not dato:
+            dato = "NAN"
+        provincias_set.add(dato)
+
+    provincias = sorted(provincias_set)
+
     return render(request, "servicios/buscador.html", {
         "servicios": servicios,
         "query": query,
@@ -900,6 +980,15 @@ def buscador_servicios(request):
         "carga_seleccionada": carga_id,
         "mes": mes,
         "anio": anio,
+        "contratista_id": contratista_id,
+        "tipo_servicio": tipo_servicio,
+        "provincia_estado_sel": provincia_estado_sel,
+        "tecnico_sel": tecnico_sel,
+        "anios_disponibles": anios_disponibles,
+        "meses_disponibles": meses_disponibles,
+        "contratistas": contratistas,
+        "provincia": provincias,
+        "tecnicos": tecnicos,
     })
 
 
@@ -917,6 +1006,19 @@ def contratista(request):
     estado_pago = request.GET.get("estado_pago")
     tipo_servicio = request.GET.get("tipo_servicio")
     provincia_estado_sel = request.GET.get("provincia_estado")
+    anios_disponibles = (
+        CargaMensual.objects.exclude(anio__isnull=True)
+        .values_list("anio", flat=True)
+        .distinct()
+        .order_by("-anio")
+    )
+
+    meses_disponibles = (
+        CargaMensual.objects.exclude(mes__isnull=True)
+        .values_list("mes", flat=True)
+        .distinct()
+        .order_by("mes")
+    )
 
     contratistas = Contratista.objects.all().order_by("nombre")
 
@@ -1002,6 +1104,8 @@ def contratista(request):
         "tipo_servicio": tipo_servicio,
         "provincia_estado_sel": provincia_estado_sel,
         "provincia": provincias,
+        "anios_disponibles": anios_disponibles,
+        "meses_disponibles": meses_disponibles,
     })
 
 

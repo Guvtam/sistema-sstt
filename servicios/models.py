@@ -59,7 +59,7 @@ class Tecnico(models.Model):
         super().save(*args, **kwargs)
 
         if self.tipo == "contratista":
-            # si no tiene contratista asignado, crearlo automáticamente
+            # Si no tiene contratista asociado, lo crea automáticamente
             if not self.contratista:
                 contratista_obj, _ = Contratista.objects.get_or_create(
                     nombre=self.nombre,
@@ -70,12 +70,21 @@ class Tecnico(models.Model):
                 self.contratista = contratista_obj
                 super().save(update_fields=["contratista"])
 
-            # actualizar servicios asociados
+            # Actualiza servicios vinculados por tecnico_obj
             self.servicios.update(contratista=self.contratista)
 
+            # Refuerzo extra: actualiza también servicios que tengan el texto del técnico
+            ServicioTecnico.objects.filter(tecnico=self.nombre).update(
+                tecnico_obj=self,
+                contratista=self.contratista
+            )
+
         else:
-            # si pasa a interno, quitar contratista de sus servicios
             self.servicios.update(contratista=None)
+            ServicioTecnico.objects.filter(tecnico=self.nombre).update(
+                tecnico_obj=self,
+                contratista=None
+            )
 
     def __str__(self):
         return f"{self.nombre} ({self.tipo}/{self.categoria})"
