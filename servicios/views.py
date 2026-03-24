@@ -16,6 +16,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from xhtml2pdf import pisa
+from django.contrib import messages
 
 from .models import CECO, CargaMensual, Contratista, ServicioTecnico, Tecnico, CuentaB2B
 
@@ -1236,13 +1237,30 @@ def editar_monto_tecnico(request, servicio_id):
 # ==============================
 
 def contratista_pdf(request):
-    mes = request.GET.get("mes")
-    anio = request.GET.get("anio")
-    carga_id = request.GET.get("carga")
-    contratista_id = request.GET.get("contratista_id")
-    estado_pago = request.GET.get("estado_pago")
-    tipo_servicio = request.GET.get("tipo_servicio")
-    provincia_estado_sel = request.GET.get("provincia_estado")
+    
+    mes = request.GET.get("mes") or ""
+    anio = request.GET.get("anio") or ""
+    carga_id = request.GET.get("carga") or ""
+    contratista_id = request.GET.get("contratista_id") or ""
+    estado_pago = request.GET.get("estado_pago") or ""
+    tipo_servicio = request.GET.get("tipo_servicio") or ""
+    provincia_estado_sel = request.GET.get("provincia_estado") or ""
+    columnas = request.GET.getlist("columnas")
+
+    if not columnas:
+        columnas = [
+            "numero",
+            "fecha_finalizacion",
+            "cuenta",
+            "cuenta_contable",
+            "ceco",
+            "provincia_estado",
+            "tipo_servicio",
+            "servicio",
+            "tecnico",
+            "observaciones",
+            "valor_pago_tecnico",
+        ]
 
     contratista_obj = None
     if contratista_id:
@@ -1300,7 +1318,48 @@ def contratista_pdf(request):
         cuenta = normalizar(s.cuenta_contable)
         s.ceco = ceco_dict.get(cuenta, "-")
 
+        if s.tecnico_obj and s.tecnico_obj.nombre:
+            s.tecnico_pdf = s.tecnico_obj.nombre
+        elif s.tecnico:
+            s.tecnico_pdf = s.tecnico
+        else:
+            s.tecnico_pdf = "-"
+
     resumen = obtener_resumen_contratista(servicios)
+    cantidad_columnas = len(columnas)
+
+    MESES_NOMBRES = {
+        "1": "Enero",
+        "2": "Febrero",
+        "3": "Marzo",
+        "4": "Abril",
+        "5": "Mayo",
+        "6": "Junio",
+        "7": "Julio",
+        "8": "Agosto",
+        "9": "Septiembre",
+        "10": "Octubre",
+        "11": "Noviembre",
+        "12": "Diciembre",
+    }
+
+    ESTADOS_PAGO_NOMBRES = {
+        "aprobado": "Aprobado",
+        "revision": "Revisión",
+        "rechazado": "Rechazado",
+        "no_cobrado": "No cobrado",
+    }
+
+    TIPOS_SERVICIO_NOMBRES = {
+        "PREVENTIV": "Preventivas",
+        "CORRECTIV": "Correctivas",
+    }
+
+    mes_mostrar = MESES_NOMBRES.get(str(mes), "Todos") if mes else "Todos"
+    anio_mostrar = anio if anio else "Todos"
+    estado_pago_mostrar = ESTADOS_PAGO_NOMBRES.get(estado_pago, "Todos") if estado_pago else "Todos"
+    tipo_servicio_mostrar = TIPOS_SERVICIO_NOMBRES.get(tipo_servicio, "Todos") if tipo_servicio else "Todos"
+    provincia_estado_mostrar = provincia_estado_sel if provincia_estado_sel else "Todos"
 
     html_string = render_to_string(
         "servicios/contratista_pdf.html",
@@ -1314,6 +1373,13 @@ def contratista_pdf(request):
             "tipo_servicio": tipo_servicio,
             "provincia_estado": provincia_estado_sel,
             "contratista_id": contratista_id,
+            "columnas": columnas,
+            "cantidad_columnas": cantidad_columnas,
+            "mes_mostrar": mes_mostrar,
+            "anio_mostrar": anio_mostrar,
+            "estado_pago_mostrar": estado_pago_mostrar,
+            "tipo_servicio_mostrar": tipo_servicio_mostrar,
+            "provincia_estado_mostrar": provincia_estado_mostrar,
         }
     )
 
