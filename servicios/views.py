@@ -745,10 +745,18 @@ def subir_excel(request):
                     # usar solo la fecha, sin hora
                     df["fecha_finalizacion_solo_dia"] = df["fecha_finalizacion_convertida"].dt.date
 
-                    # incidencias en los últimos 60 días por cuenta_contable, incluyendo el día actual
+                    # normalizar técnico para separar el conteo por el mismo contratista/técnico
+                    df["tecnico_normalizado"] = df["Tecnico"].apply(
+                        lambda x: normalizar_nombre(limpiar_nombre_tecnico(x))
+                    )
+
+                    # incidencias en los últimos 60 días por cuenta_contable + mismo técnico/contratista
                     df["numero_incidencias_60_dias"] = 0
 
-                    for cuenta, grupo in df.groupby("cuenta_contable", dropna=False):
+                    for (cuenta, tecnico), grupo in df.groupby(
+                        ["cuenta_contable", "tecnico_normalizado"],
+                        dropna=False
+                    ):
                         grupo = grupo.sort_values("fecha_finalizacion_solo_dia").copy()
 
                         fechas = grupo["fecha_finalizacion_solo_dia"]

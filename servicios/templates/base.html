@@ -17,14 +17,15 @@
 <style>
 
 body{
-font-family:'Inter',sans-serif;
-background:#f1f5f9;
+    font-family:'Inter',sans-serif;
+    background:#f1f5f9;
+    padding-top:70px;
 }
 
 /* NAVBAR */
 
 .navbar-custom{
-background:#1e293b;
+background:#f38033;
 padding:14px 25px;
 box-shadow:0 4px 12px rgba(0,0,0,0.1);
 }
@@ -46,7 +47,8 @@ color:#cbd5e1 !important;
 /* CONTENIDO */
 
 .main-content{
-padding:30px;
+padding:20px;
+margin-top:20px; /* 👈 agrega esto */
 }
 
 .card-custom{
@@ -54,6 +56,7 @@ background:white;
 padding:25px;
 border-radius:10px;
 box-shadow:0 4px 15px rgba(0,0,0,0.05);
+margin-top: 20px;
 }
 
 /* TARJETAS KPI */
@@ -87,6 +90,10 @@ color:white;
 height:40px;
 margin-right:10px;
 }
+.sticky-top-container{
+    top:70px;
+    z-index:1020;
+}
 
 </style>
 
@@ -94,9 +101,9 @@ margin-right:10px;
 
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-custom">
+<nav class="navbar navbar-expand-lg navbar-custom fixed-top">
 
-<div class="container-fluid">
+<div class="container-fluid main-content">
 
 <a class="navbar-brand d-flex align-items-center" href="{% url 'contratista' %}">
 <img src="{% static 'servicios/img/first-security-logo.png' %}" class="logo">
@@ -145,7 +152,11 @@ Sistema Gestión Pagos
 
 <div class="card-custom">
 
+
+
 {% block content %}
+
+
 {% endblock %}
 
 </div>
