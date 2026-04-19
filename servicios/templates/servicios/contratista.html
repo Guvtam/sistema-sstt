@@ -14,8 +14,6 @@
 
 <br>
 
-<!--MODAL-->
-
 <div class="modal fade" id="modalPdf" tabindex="-1" aria-labelledby="modalPdfLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -169,7 +167,6 @@
             <option value="aprobado" {% if estado_pago == "aprobado" %}selected{% endif %}>Aprobados</option>
             <option value="revision" {% if estado_pago == "revision" %}selected{% endif %}>Revisión</option>
             <option value="rechazado" {% if estado_pago == "rechazado" %}selected{% endif %}>Rechazados</option>
-            <option value="no_cobrado" {% if estado_pago == "no_cobrado" %}selected{% endif %}>No Cobrado</option>
         </select>
     </div>
 
@@ -180,13 +177,9 @@
     </div>
 </form>
 
-
-
-<!-- KPI + TABLA DERECHA -->
 <div class="sticky-top-container p-3 mb-2 bg-light">
     <div class="row g-3">
 
-        <!-- IZQUIERDA -->
         <div class="col-md-4 d-flex flex-column">
             <div class="kpi-card mb-4 text-center">
                 <div class="kpi-title">Contratista</div>
@@ -200,7 +193,6 @@
             </div>
 
             <div class="kpi-card text-center">
-
                 <div class="kpi-title">Total Mantenciones</div>
                 <div class="kpi-value">{{ resumen.total_mantenciones|default:0 }}</div>
 
@@ -213,13 +205,11 @@
                 <div class="kpi-value text-success" id="monto_aprobado">
                     ${{ resumen.monto_aprobado|default:0|floatformat:0|intcomma }}
                 </div>
-
             </div>
         </div>
 
-        <!-- CENTRO -->
-        <div class="col-md-4">
-            <div class="row g-3">
+        <div class="col-md-4 d-flex flex-column h-100">
+            <div class="row g-3 align-items-stretch">
 
                 <div class="col-md-6">
                     <div class="kpi-card text-center border-success">
@@ -227,11 +217,7 @@
                         <div class="kpi-value">{{ resumen.total_preventivas|default:0 }}</div>
                         <div class="small text-muted">Monto</div>
                         <div class="kpi-value" id="total_preventivas">
-                            ${{ resumen.monto_preventivas|default:0|intcomma }}
-                        </div>
-                        <div class="small text-muted mt-2">Aprobado</div>
-                        <div class="kpi-value text-success" id="aprobado_preventivas_monto">
-                            ${{ resumen.monto_aprobado_preventivas|default:0|floatformat:0|intcomma }}
+                            ${{ resumen.monto_preventivas|default:0|floatformat:0|intcomma }}
                         </div>
                     </div>
                 </div>
@@ -242,11 +228,7 @@
                         <div class="kpi-value">{{ resumen.total_correctivas|default:0 }}</div>
                         <div class="small text-muted">Monto</div>
                         <div class="kpi-value" id="total_correctivas">
-                            ${{ resumen.monto_correctivas|default:0|intcomma }}
-                        </div>
-                        <div class="small text-muted mt-2">Aprobado</div>
-                        <div class="kpi-value text-success" id="aprobado_correctivas_monto">
-                            ${{ resumen.monto_aprobado_correctivas|default:0|floatformat:0|intcomma }}
+                            ${{ resumen.monto_correctivas|default:0|floatformat:0|intcomma }}
                         </div>
                     </div>
                 </div>
@@ -257,11 +239,7 @@
                         <div class="kpi-value">{{ resumen.total_b2b|default:0 }}</div>
                         <div class="small text-muted">Monto</div>
                         <div class="kpi-value">
-                            ${{ resumen.monto_b2b|default:0|intcomma }}
-                        </div>
-                        <div class="small text-muted mt-2">Aprobado</div>
-                        <div class="kpi-value text-success">
-                            ${{ resumen.monto_aprobado_b2b|default:0|floatformat:0|intcomma }}
+                            ${{ resumen.monto_b2b|default:0|floatformat:0|intcomma }}
                         </div>
                     </div>
                 </div>
@@ -269,15 +247,10 @@
                 <div class="col-md-6">
                     <div class="kpi-card text-center border-secondary">
                         <div class="kpi-title text-secondary">B2C</div>
-                        
                         <div class="kpi-value">{{ resumen.total_b2c|default:0 }}</div>
                         <div class="small text-muted">Monto</div>
                         <div class="kpi-value">
-                            ${{ resumen.monto_b2c|default:0|intcomma }}
-                        </div>
-                        <div class="small text-muted mt-2">Aprobado</div>
-                        <div class="kpi-value text-success">
-                            ${{ resumen.monto_aprobado_b2c|default:0|floatformat:0|intcomma }}
+                            ${{ resumen.monto_b2c|default:0|floatformat:0|intcomma }}
                         </div>
                     </div>
                 </div>
@@ -285,7 +258,6 @@
             </div>
         </div>
 
-        <!-- DERECHA -->
         <div class="col-md-4">
             <table class="table table-sm table-bordered text-center h-100 align-middle">
                 <thead class="table-light">
@@ -300,31 +272,24 @@
                 <tbody>
                     <tr>
                         <td class="text-success fw-bold">✔ Aprobado</td>
-                        <td id="cantidad_aprobado">{{ resumen.cantidad_aprobado }}</td>
-                        <td id="aprobado_preventivas">{{ resumen.aprobado_preventivas }}</td>
-                        <td id="aprobado_correctivas">{{ resumen.aprobado_correctivas }}</td>
-                        <td id="tabla_monto_aprobado">$ {{ resumen.monto_aprobado|intcomma }}</td>
+                        <td>{{ resumen.resumen_estados.aprobado.cantidad }}</td>
+                        <td>{{ resumen.resumen_estados.aprobado.preventivas }}</td>
+                        <td>{{ resumen.resumen_estados.aprobado.correctivas }}</td>
+                        <td>$ {{ resumen.resumen_estados.aprobado.monto|floatformat:0|intcomma }}</td>
                     </tr>
                     <tr>
-                        <td class="text-warning fw-bold">⏳En Revisión</td>
-                        <td id="cantidad_revision">{{ resumen.cantidad_revision }}</td>
-                        <td id="revision_preventivas">{{ resumen.revision_preventivas }}</td>
-                        <td id="revision_correctivas">{{ resumen.revision_correctivas }}</td>
-                        <td id="tabla_monto_revision">$ {{ resumen.monto_revision|intcomma }}</td>
+                        <td class="text-warning fw-bold">⏳ En Revisión</td>
+                        <td>{{ resumen.resumen_estados.revision.cantidad }}</td>
+                        <td>{{ resumen.resumen_estados.revision.preventivas }}</td>
+                        <td>{{ resumen.resumen_estados.revision.correctivas }}</td>
+                        <td>$ {{ resumen.resumen_estados.revision.monto|floatformat:0|intcomma }}</td>
                     </tr>
                     <tr>
                         <td class="text-danger fw-bold">✖ Rechazado</td>
-                        <td id="cantidad_rechazado">{{ resumen.cantidad_rechazado }}</td>
-                        <td id="rechazado_preventivas">{{ resumen.rechazado_preventivas }}</td>
-                        <td id="rechazado_correctivas">{{ resumen.rechazado_correctivas }}</td>
-                        <td id="tabla_monto_rechazado">$ {{ resumen.monto_rechazado|intcomma }}</td>
-                    </tr>
-                    <tr>
-                        <td class="text-secondary fw-bold">— No Cobrado</td>
-                        <td id="cantidad_no_cobrado">{{ resumen.cantidad_no_cobrado }}</td>
-                        <td id="no_cobrado_preventivas">{{ resumen.no_cobrado_preventivas }}</td>
-                        <td id="no_cobrado_correctivas">{{ resumen.no_cobrado_correctivas }}</td>
-                        <td id="tabla_monto_no_cobrado">$ {{ resumen.monto_no_cobrado|intcomma }}</td>
+                        <td>{{ resumen.resumen_estados.rechazado.cantidad }}</td>
+                        <td>{{ resumen.resumen_estados.rechazado.preventivas }}</td>
+                        <td>{{ resumen.resumen_estados.rechazado.correctivas }}</td>
+                        <td>$ {{ resumen.resumen_estados.rechazado.monto|floatformat:0|intcomma }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -332,6 +297,7 @@
 
     </div>
 </div>
+
 {% if messages %}
     {% for message in messages %}
         <div class="alert alert-danger">
@@ -340,7 +306,6 @@
     {% endfor %}
 {% endif %}
 
-<!-- TABLA -->
 <div class="table-responsive">
 <table class="table table-bordered table-hover">
 <thead class="table-dark">
@@ -349,7 +314,7 @@
 <th>Fecha Finalización</th>
 <th>Cuenta First</th>
 <th>Cuenta</th>
-<th>Ceco</th>
+<th>CECO</th>
 <th>Provincia-Estado</th>
 <th>Tipo</th>
 <th>Tipo servicio</th>
@@ -379,7 +344,13 @@
 
     <td>{{ s.cuenta }}</td>
 
-    <td>{{ s.ceco }}</td>
+    <td>
+        {% if s.ceco %}
+            {{ s.ceco.ceco }}
+        {% else %}
+            -
+        {% endif %}
+    </td>
 
     <td>{{ s.provincia_estado }}</td>
 
@@ -399,7 +370,6 @@
         {% endif %}
     </td>
 
-    <!-- 💰 EDICIÓN DE MONTO (FUNCIONA CON JS) -->
     <td>
         <span class="monto-texto" id="texto-{{ s.id }}">
             ${{ s.valor_pago_tecnico|floatformat:0|intcomma }}
@@ -432,7 +402,6 @@
         </button>
     </td>
 
-    <!-- 🚨 INCIDENCIAS -->
     <td>
         {% if s.numero_incidencias_dia > 2 %}
             <span class="badge bg-danger">{{ s.numero_incidencias_dia }}</span>
@@ -442,7 +411,7 @@
             <span class="badge bg-success">{{ s.numero_incidencias_dia }}</span>
         {% endif %}
     </td>
-    <!-- 🚨 INCIDENCIAS -->
+
     <td>
         {% if s.numero_incidencias_60_dias > 2 %}
             <span class="badge bg-danger">{{ s.numero_incidencias_60_dias }}</span>
@@ -453,15 +422,12 @@
         {% endif %}
     </td>
 
-    <!-- 🔄 ESTADO PAGO (FUNCIONA CON JS) -->
     <td>
         <div class="d-flex gap-1">
             <select id="estado-{{ s.id }}" class="form-select form-select-sm">
-                {% for key, value in s.ESTADO_PAGO_CHOICES %}
-                <option value="{{ key }}" {% if s.estado_pago == key %}selected{% endif %}>
-                    {{ value }}
-                </option>
-                {% endfor %}
+                <option value="aprobado" {% if s.estado_pago == "aprobado" %}selected{% endif %}>Aprobado</option>
+                <option value="revision" {% if s.estado_pago == "revision" %}selected{% endif %}>En Revisión</option>
+                <option value="rechazado" {% if s.estado_pago == "rechazado" %}selected{% endif %}>Rechazado</option>
             </select>
 
             <button type="button"
@@ -480,15 +446,12 @@
 </div>
 
 <script>
-
-
-
 function guardarEstado(id) {
     const estado = document.getElementById('estado-' + id).value;
 
     sessionStorage.setItem("scrollPos", window.scrollY);
 
-    fetch("{% url 'cambiar_estado_pago' 0 %}".replace('0', id), {
+    fetch("{% url 'actualizar_estado_pago' 0 %}".replace('0', id), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -498,12 +461,12 @@ function guardarEstado(id) {
     })
     .then(res => res.json())
     .then(data => {
-        if (data.success) {
+        if (data.ok) {
             const url = new URL(window.location.href);
             url.searchParams.set('_t', Date.now());
             window.location.href = url.toString();
         } else {
-            alert('No se pudo actualizar el estado.');
+            alert(data.error || 'No se pudo actualizar el estado.');
         }
     })
     .catch(error => {
@@ -519,9 +482,6 @@ document.addEventListener("DOMContentLoaded", function () {
         sessionStorage.removeItem("scrollPos");
     }
 });
-
-
-
 
 function mostrarEdicion(id) {
     document.getElementById('texto-' + id).classList.add('d-none');
@@ -554,7 +514,7 @@ function guardarMonto(id) {
     })
     .then(res => res.json())
     .then(data => {
-        if (data.success) {
+        if (data.ok || data.success) {
             const url = new URL(window.location.href);
             url.searchParams.set('_t', Date.now());
             window.location.href = url.toString();
@@ -568,13 +528,10 @@ function guardarMonto(id) {
     });
 }
 
-
-// tooltips bootstrap
 document.addEventListener('DOMContentLoaded', function () {
     const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
     tooltips.forEach(el => new bootstrap.Tooltip(el));
 });
-
 
 function validarContratista() {
     const contratista = document.getElementById("contratista_id").value;
@@ -589,10 +546,8 @@ function validarContratista() {
     const url = `/contratista/pdf/?contratista_id=${contratista}&mes=${mes}&anio=${anio}`;
 
     window.open(url, "_blank");
-    return false; // evita que use el href
+    return false;
 }
-
-
 
 document.addEventListener("DOMContentLoaded", function () {
     const modalBtn = document.querySelector('[data-bs-target="#modalPdf"]');
@@ -630,8 +585,6 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 });
-
-
 </script>
 
 {% endblock %}

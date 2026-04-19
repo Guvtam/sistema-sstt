@@ -11,7 +11,7 @@ from .models import (
 
 @admin.register(CargaMensual)
 class CargaMensualAdmin(admin.ModelAdmin):
-    list_display = ("id", "nombre", "mes", "anio", "fecha_carga")
+    list_display = ("id", "nombre", "mes", "anio", "fecha_creacion")
     search_fields = ("nombre",)
     list_filter = ("anio", "mes")
 

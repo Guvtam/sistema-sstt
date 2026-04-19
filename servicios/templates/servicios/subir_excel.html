@@ -7,84 +7,87 @@
 <h3 class="mb-4 text-center">Carga Mensual de Servicios</h3>
 
 <div class="row justify-content-center">
-<div class="col-md-8">
+    <div class="col-md-8">
 
-<form method="post" enctype="multipart/form-data">
-
-    {% csrf_token %}
-
-    <div class="row">
-        <div class="col-md-12">
-            <label class="form-label">Nombre carga</label>
-            <input type="text"
-                name="nombre_carga"
-                class="form-control"
-                placeholder="Ej: Servicios Enero 2026"
-                required>
+        <div class="alert alert-info">
+            <strong>Flujo actual:</strong> los archivos se cargan, se guardan como origen, se procesan y solo se publican las filas válidas.
+            Las filas con problemas quedan registradas en <strong>Observaciones</strong>.
         </div>
+
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="row">
+                <div class="col-md-12">
+                    <label class="form-label">Nombre carga</label>
+                    <input type="text"
+                           name="nombre_carga"
+                           class="form-control"
+                           placeholder="Ej: Servicios Marzo 2026"
+                           required>
+                </div>
+            </div>
+
+            <div class="row mt-3">
+
+                <div class="col-md-6">
+                    <label class="form-label">Mes</label>
+                    <select name="mes" class="form-select" required>
+                        <option value="">Seleccione mes</option>
+                        <option value="1">Enero</option>
+                        <option value="2">Febrero</option>
+                        <option value="3">Marzo</option>
+                        <option value="4">Abril</option>
+                        <option value="5">Mayo</option>
+                        <option value="6">Junio</option>
+                        <option value="7">Julio</option>
+                        <option value="8">Agosto</option>
+                        <option value="9">Septiembre</option>
+                        <option value="10">Octubre</option>
+                        <option value="11">Noviembre</option>
+                        <option value="12">Diciembre</option>
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Año</label>
+                    <select name="anio" class="form-select" required>
+                        <option value="">Seleccione año</option>
+                        <option value="2025">2025</option>
+                        <option value="2026">2026</option>
+                        <option value="2027">2027</option>
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="row mt-3">
+
+                <div class="col-md-6">
+                    <label class="form-label">Seleccione archivo 1</label>
+                    <input class="form-control" type="file" name="archivo1" required>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Seleccione archivo 2</label>
+                    <input class="form-control" type="file" name="archivo2" required>
+                </div>
+
+            </div>
+
+            <div class="mt-4 text-center">
+                <button class="btn btn-primary px-5">Cargar y procesar</button>
+            </div>
+
+        </form>
+
+        {% if mensaje %}
+            <div class="alert {% if 'Error' in mensaje %}alert-danger{% else %}alert-success{% endif %} mt-4 text-center">
+                {{ mensaje }}
+            </div>
+        {% endif %}
+
     </div>
-
-    <div class="row mt-3">
-
-        <div class="col-md-6">
-            <label class="form-label">Mes</label>
-            <select name="mes" class="form-select" required>
-                <option value="">Seleccione mes</option>
-                <option value="1">Enero</option>
-                <option value="2">Febrero</option>
-                <option value="3">Marzo</option>
-                <option value="4">Abril</option>
-                <option value="5">Mayo</option>
-                <option value="6">Junio</option>
-                <option value="7">Julio</option>
-                <option value="8">Agosto</option>
-                <option value="9">Septiembre</option>
-                <option value="10">Octubre</option>
-                <option value="11">Noviembre</option>
-                <option value="12">Diciembre</option>
-            </select>
-        </div>
-
-        <div class="col-md-6">
-            <label class="form-label">Año</label>
-            <select name="anio" class="form-select" required>
-                <option value="">Seleccione año</option>
-                
-                <option value="2025">2025</option>
-                <option value="2026">2026</option>
-                
-            </select>
-        </div>
-
-    </div>
-
-    <div class="row mt-3">
-
-        <div class="col-md-6">
-            <label class="form-label">Seleccione archivo 1:</label>
-            <input class="form-control" type="file" name="archivo1" required>
-        </div>
-
-        <div class="col-md-6">
-            <label class="form-label">Seleccione archivo 2:</label>
-            <input class="form-control" type="file" name="archivo2" required>
-        </div>
-
-    </div>
-
-    <div class="mt-4 text-center">
-        <button class="btn btn-primary px-5">Procesar Archivos</button>
-    </div>
-
-</form>
-
-{% if mensaje %}
-<div class="alert alert-success mt-4 text-center">
-    {{ mensaje }}
-</div>
-{% endif %}
-
-</div>
 </div>
 
 {% endblock %}

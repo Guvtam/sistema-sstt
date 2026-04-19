@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle Observación{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4 text-center">Detalle de Observación</h2>
+
+<div class="row g-4">
+
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                Información de la observación
+            </div>
+            <div class="card-body">
+                <p><strong>ID:</strong> {{ observacion.id }}</p>
+                <p><strong>Estado:</strong> {{ observacion.get_estado_display }}</p>
+                <p><strong>Tipo:</strong> {{ observacion.get_tipo_display }}</p>
+                <p><strong>Detalle:</strong> {{ observacion.detalle }}</p>
+                <p><strong>Valor detectado:</strong> {{ observacion.valor_detectado|default:"-" }}</p>
+                <p><strong>Sugerencia:</strong> {{ observacion.sugerencia|default:"-" }}</p>
+                <p><strong>Archivo:</strong> {{ raw.archivo_carga.nombre_original }}</p>
+                <p><strong>Fila:</strong> {{ raw.fila_numero }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-secondary text-white">
+                Datos raw detectados
+            </div>
+            <div class="card-body">
+                <p><strong>Número OT:</strong> {{ raw.numero_ot|default:"-" }}</p>
+                <p><strong>Técnico texto:</strong> {{ raw.tecnico_texto|default:"-" }}</p>
+                <p><strong>Técnico normalizado:</strong> {{ raw.tecnico_normalizado|default:"-" }}</p>
+                <p><strong>Cuenta texto:</strong> {{ raw.cuenta_texto|default:"-" }}</p>
+                <p><strong>Cuenta contable:</strong> {{ raw.cuenta_contable|default:"-" }}</p>
+                <p><strong>Tipo servicio:</strong> {{ raw.tipo_servicio|default:"-" }}</p>
+                <p><strong>Valor pago técnico:</strong> {{ raw.valor_pago_tecnico|default:"-" }}</p>
+                <p><strong>Estado raw:</strong> {{ raw.get_estado_display }}</p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<hr class="my-4">
+
+<div class="row g-4">
+
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                Resolver vinculando contratista
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'resolver_observacion_contratista' observacion.id %}">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label">Selecciona contratista</label>
+                        <select name="contratista_id" class="form-select" required>
+                            <option value="">Seleccione</option>
+                            {% for c in contratistas %}
+                                <option value="{{ c.id }}">{{ c.nombre }} - {{ c.nombre_empresa }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="crear_alias" id="crear_alias_contratista" checked>
+                        <label class="form-check-label" for="crear_alias_contratista">
+                            Crear alias con el nombre detectado
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-success">
+                        Vincular contratista
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="row g-4 mt-1">
+
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    Crear contratista nuevo desde la observación
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'crear_contratista_desde_observacion' observacion.id %}">
+                        {% csrf_token %}
+
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Nombre empresa</label>
+                                <input type="text" name="nombre_empresa" class="form-control"
+                                    value="{{ raw.tecnico_texto|default:'' }}">
+                            </div>
+
+                            <div class="col-md-2">
+                                <label class="form-label">RUT</label>
+                                <input type="text" name="rut" class="form-control">
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Correo</label>
+                                <input type="email" name="correo" class="form-control">
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Ciudad</label>
+                                <input type="text" name="ciudad" class="form-control">
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Fono</label>
+                                <input type="text" name="fono" class="form-control">
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Banco</label>
+                                <input type="text" name="banco" class="form-control">
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Tipo cuenta</label>
+                                <input type="text" name="tipo_cuenta" class="form-control">
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Número cuenta</label>
+                                <input type="text" name="numero_cuenta" class="form-control">
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Categoría</label>
+                                <select name="categoria" class="form-select">
+                                    <option value="Factura">Factura</option>
+                                    <option value="Factura exenta">Factura exenta</option>
+                                    <option value="Boleta honorarios">Boleta honorarios</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-success">
+                                Crear contratista
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+
+
+
+
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-dark">
+                Resolver vinculando técnico
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'resolver_observacion_tecnico' observacion.id %}">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label">Selecciona técnico</label>
+                        <select name="tecnico_id" class="form-select" required>
+                            <option value="">Seleccione</option>
+                            {% for t in tecnicos %}
+                                <option value="{{ t.id }}">{{ t.nombre }} ({{ t.tipo }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="crear_alias" id="crear_alias_tecnico" checked>
+                        <label class="form-check-label" for="crear_alias_tecnico">
+                            Crear alias técnico con el nombre detectado
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        Vincular técnico
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<hr class="my-4">
+
+<div class="d-flex gap-2 flex-wrap">
+
+    <form method="post" action="{% url 'reprocesar_raw' raw.id %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-warning">
+            Reprocesar fila
+        </button>
+    </form>
+
+    <form method="post" action="{% url 'marcar_observacion_ignorada' observacion.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="comentario" value="Ignorada manualmente desde detalle">
+        <button type="submit" class="btn btn-secondary">
+            Ignorar observación
+        </button>
+    </form>
+
+    <a href="{% url 'observaciones_importacion' %}" class="btn btn-outline-dark">
+        Volver
+    </a>
+</div>
+
+{% endblock %}

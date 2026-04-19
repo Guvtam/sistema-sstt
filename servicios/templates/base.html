@@ -15,86 +15,77 @@
 <title>{% block title %}Sistema Gestión Pagos{% endblock %}</title>
 
 <style>
-
 body{
     font-family:'Inter',sans-serif;
     background:#f1f5f9;
     padding-top:70px;
 }
 
-/* NAVBAR */
-
 .navbar-custom{
-background:#f38033;
-padding:14px 25px;
-box-shadow:0 4px 12px rgba(0,0,0,0.1);
+    background:#f38033;
+    padding:14px 25px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.1);
 }
 
 .navbar-custom .nav-link,
 .navbar-custom .navbar-brand{
-color:white !important;
+    color:white !important;
 }
 
 .nav-link{
-margin-left:14px;
-font-size:14px;
+    margin-left:14px;
+    font-size:14px;
 }
 
 .nav-link:hover{
-color:#cbd5e1 !important;
+    color:#cbd5e1 !important;
 }
 
-/* CONTENIDO */
-
 .main-content{
-padding:20px;
-margin-top:20px; /* 👈 agrega esto */
+    padding:20px;
+    margin-top:20px;
 }
 
 .card-custom{
-background:white;
-padding:25px;
-border-radius:10px;
-box-shadow:0 4px 15px rgba(0,0,0,0.05);
-margin-top: 20px;
+    background:white;
+    padding:25px;
+    border-radius:10px;
+    box-shadow:0 4px 15px rgba(0,0,0,0.05);
+    margin-top:20px;
 }
 
-/* TARJETAS KPI */
-
 .kpi-card{
-background:white;
-border-radius:10px;
-padding:20px;
-text-align:center;
-box-shadow:0 3px 10px rgba(0,0,0,0.08);
+    background:white;
+    border-radius:10px;
+    padding:20px;
+    text-align:center;
+    box-shadow:0 3px 10px rgba(0,0,0,0.08);
 }
 
 .kpi-title{
-font-size:13px;
-color:#64748b;
+    font-size:13px;
+    color:#64748b;
 }
 
 .kpi-value{
-font-size:24px;
-font-weight:600;
+    font-size:24px;
+    font-weight:600;
 }
 
-/* TABLA */
-
 .table thead{
-background:#1e293b;
-color:white;
+    background:#1e293b;
+    color:white;
 }
 
 .logo{
-height:40px;
-margin-right:10px;
+    height:40px;
+    margin-right:10px;
 }
+
 .sticky-top-container{
     top:70px;
     z-index:1020;
 }
-
 </style>
 
 </head>
@@ -102,65 +93,70 @@ margin-right:10px;
 <body>
 
 <nav class="navbar navbar-expand-lg navbar-custom fixed-top">
+    <div class="container-fluid main-content">
 
-<div class="container-fluid main-content">
+        <a class="navbar-brand d-flex align-items-center" href="{% url 'contratista' %}">
+            <img src="{% static 'servicios/img/first-security-logo.png' %}" class="logo">
+            Sistema Gestión Pagos
+        </a>
 
-<a class="navbar-brand d-flex align-items-center" href="{% url 'contratista' %}">
-<img src="{% static 'servicios/img/first-security-logo.png' %}" class="logo">
-Sistema Gestión Pagos
-</a>
+        <button class="navbar-toggler bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
 
-<button class="navbar-toggler bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-<span class="navbar-toggler-icon"></span>
-</button>
+        <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+            <ul class="navbar-nav">
 
-<div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'subir_excel' %}">Carga Archivos</a>
+                </li>
 
-<ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'cargas_archivos' %}">Cargas Procesadas</a>
+                </li>
 
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'observaciones_importacion' %}">Observaciones</a>
+                </li>
 
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'buscador_servicios' %}">Buscador</a>
+                </li>
 
-<li class="nav-item">
-<a class="nav-link" href="{% url 'subir_excel' %}">Carga Archivos</a>
-</li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'contratista' %}">Contratistas</a>
+                </li>
 
-<li class="nav-item">
-<a class="nav-link" href="{% url 'buscador_servicios' %}">Buscador</a>
-</li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'internos' %}">Internos</a>
+                </li>
 
-<li class="nav-item">
-<a class="nav-link" href="{% url 'contratista' %}">Contratistas</a>
-</li>
+                <li class="nav-item">
+                    <a class="nav-link disabled" href="{% url 'exportar_excel' %}">Exportar Excel</a>
+                </li>
 
-<li class="nav-item">
-<a class="nav-link" href="{% url 'internos' %}">Internos</a>
-</li>
+            </ul>
+        </div>
 
-<li class="nav-item">
-<a class="nav-link disabled" href="{% url 'exportar_excel' %}">Exportar Excel</a>
-</li>
-
-</ul>
-
-</div>
-
-</div>
-
+    </div>
 </nav>
 
 <div class="container-fluid main-content">
+    <div class="card-custom">
 
-<div class="card-custom">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show mt-2" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
 
+        {% block content %}
+        {% endblock %}
 
-
-{% block content %}
-
-
-{% endblock %}
-
-</div>
-
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>

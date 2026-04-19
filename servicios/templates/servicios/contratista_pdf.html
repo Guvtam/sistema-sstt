@@ -6,19 +6,19 @@
     <style>
         @page {
             size: A4 landscape;
-            margin: 1cm;
+            margin: 0.9cm;
         }
 
         body {
             font-family: Arial, sans-serif;
-            font-size: 9px;
+            font-size: 8.5px;
             color: #1f2937;
         }
 
         .header {
             border-bottom: 2px solid #1f2937;
-            padding-bottom: 8px;
-            margin-bottom: 12px;
+            padding-bottom: 6px;
+            margin-bottom: 10px;
         }
 
         .header h1 {
@@ -28,7 +28,7 @@
 
         .header p {
             margin: 2px 0 0 0;
-            font-size: 10px;
+            font-size: 9px;
             color: #6b7280;
         }
 
@@ -37,9 +37,9 @@
         }
 
         .titulo-seccion {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: bold;
-            margin-bottom: 6px;
+            margin-bottom: 5px;
             text-transform: uppercase;
             color: #374151;
         }
@@ -47,18 +47,15 @@
         .label {
             display: block;
             font-size: 7px;
-            color: #7b8794;
+            color: #6b7280;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 0.4px;
             margin-bottom: 2px;
         }
 
-        .right {
-            text-align: right;
-        }
+        .right { text-align: right; }
+        .center { text-align: center; }
 
-        /* FILTROS */
         .filtros-table,
         .resumen-table,
         .totales-table,
@@ -74,11 +71,9 @@
             vertical-align: top;
         }
 
-        /* BLOQUE CONTRATISTA MÁS COMPACTO */
         .contratista-card {
             border: 1px solid #d8dee6;
             background: #ffffff;
-            padding: 0;
             margin-top: 2px;
         }
 
@@ -104,13 +99,13 @@
         }
 
         .contratista-grid {
-            padding: 4px 8px 2px 8px;
+            padding: 5px 8px 3px 8px;
         }
 
         .contratista-row {
             width: 100%;
-            margin-bottom: 1px;
             border-collapse: collapse;
+            margin-bottom: 1px;
         }
 
         .contratista-row td {
@@ -131,28 +126,25 @@
             word-break: break-word;
         }
 
-        /* TABLAS RESUMEN */
         .resumen-table th,
         .totales-table th,
         .servicios-table th {
             background: #1f2937;
             color: #ffffff;
-            padding: 8px 6px;
+            padding: 6px 5px;
             border: 1px solid #111827;
             font-size: 7px;
             font-weight: bold;
             text-align: center;
             vertical-align: middle;
-            line-height: 1.25;
-            white-space: normal;
-            word-break: break-word;
+            line-height: 1.2;
         }
 
         .resumen-table td,
         .totales-table td {
-            padding: 6px 8px;
+            padding: 5px 7px;
             border: 1px solid #d1d5db;
-            font-size: 9px;
+            font-size: 8px;
         }
 
         .total-row {
@@ -165,23 +157,18 @@
             font-weight: bold;
         }
 
-        /* TABLA SERVICIOS */
-        
         .servicios-table {
-            width: 100%;
-            border-collapse: collapse;
             table-layout: fixed;
         }
 
-        .servicios-table th,
         .servicios-table td {
             border: 1px solid #d1d5db;
-            padding: 6px 7px;
-            font-size: 6.6px;
+            padding: 5px 5px;
+            font-size: 6.7px;
             vertical-align: top;
+            line-height: 1.3;
             word-wrap: break-word;
             overflow-wrap: break-word;
-            line-height: 1.35;
         }
 
         .servicios-table tr:nth-child(even) {
@@ -191,92 +178,35 @@
         .monto {
             text-align: right;
             white-space: nowrap;
-        }
-
-        .obs {
-            white-space: normal;
-            word-break: break-word;
-            overflow-wrap: break-word;
-            line-height: 1.35;
-        }
-
-        /* anchos optimizados */
-        .w-numero   { width: 3%; }
-        .w-fecha    { width: 7%; }
-        .w-cuenta   { width: 8%; }
-        .w-contable { width: 5%; }
-        .w-ceco     { width: 4%; }
-        .w-prov     { width: 5%; }
-        .w-tipo     { width: 4%; }
-        .w-servicio { width: 5%; }
-        .w-tecnico  { width: 6%; }
-        .w-obs      { width: 45%; }
-        .w-monto    { width: 8%; }
-
-        .w-cuenta,
-        .w-servicio {
-            word-break: break-word;
-            white-space: normal;
-            font-size: 7px;  /* 🔥 reduce impacto */
-        }
-        
-        .obs {
-        white-space: normal;
-        word-break: break-word;
-        overflow-wrap: break-word;
-        line-height: 1.4;
-        font-size: 8px;
-    }
-
-        .celda-cuenta,
-        .celda-servicio,
-        .celda-tecnico,
-        .celda-provincia {
-            font-size: 7px;
-            line-height: 1.25;
-            word-break: break-word;
-            white-space: normal;
-        }
-
-        .celda-numero,
-        .celda-fecha,
-        .celda-contable,
-        .celda-ceco,
-        .celda-provincia,
-        .celda-tipo,
-        .celda-servicio,
-        .celda-tecnico {
-            font-size: 6.4px;
-            line-height: 1.3;
-            text-align: left;
-            white-space: normal;
-            word-break: break-word;
-        }
-
-        .celda-cuenta {
-            font-size: 6.2px;
-            line-height: 1.3;
-            text-align: left;
-            white-space: normal;
-            word-break: break-word;
-        }
-
-        .obs {
-            white-space: normal;
-            word-break: break-word;
-            overflow-wrap: break-word;
-            line-height: 1.45;
-            font-size: 6.8px;
-            text-align: left;
-        }
-
-        .monto {
-            text-align: right;
-            white-space: nowrap;
             font-size: 6.8px;
             font-weight: bold;
         }
 
+        .obs {
+            font-size: 6.5px;
+            line-height: 1.35;
+            text-align: left;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .celda-mini {
+            font-size: 6.2px;
+            line-height: 1.25;
+        }
+
+        /* anchos optimizados */
+        .w-numero   { width: 4%; }
+        .w-fecha    { width: 8%; }
+        .w-cuenta   { width: 19%; }
+        .w-contable { width: 7%; }
+        .w-ceco     { width: 5%; }
+        .w-prov     { width: 8%; }
+        .w-tipo     { width: 6%; }
+        .w-servicio { width: 12%; }
+        .w-tecnico  { width: 10%; }
+        .w-obs      { width: 15%; }
+        .w-monto    { width: 6%; }
     </style>
 </head>
 <body>
@@ -410,26 +340,6 @@
                 </tr>
             </thead>
             <tbody>
-                <tr class="total-row">
-                    <td>Total mantenciones</td>
-                    <td class="right">{{ resumen.total_mantenciones|default:0 }}</td>
-                    <td class="right">${{ resumen.monto_total|default:0|floatformat:0|intcomma }}</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div class="box">
-        <div class="titulo-seccion">Resumen B2B / B2C</div>
-        <table class="resumen-table">
-            <thead>
-                <tr>
-                    <th>Concepto</th>
-                    <th class="right">Cantidad</th>
-                    <th class="right">Monto</th>
-                </tr>
-            </thead>
-            <tbody>
                 <tr>
                     <td>B2B</td>
                     <td class="right">{{ resumen.total_b2b|default:0 }}</td>
@@ -476,36 +386,74 @@
             <thead>
                 <tr>
                     {% if "numero" in columnas %}<th class="w-numero">N°</th>{% endif %}
-                    {% if "fecha_finalizacion" in columnas %}<th class="w-fecha">Fecha<br>finalización</th>{% endif %}
+                    {% if "fecha_finalizacion" in columnas %}<th class="w-fecha">Fecha finalización</th>{% endif %}
                     {% if "cuenta" in columnas %}<th class="w-cuenta">Cuenta</th>{% endif %}
-                    {% if "cuenta_contable" in columnas %}<th class="w-contable">Cuenta<br>contable</th>{% endif %}
+                    {% if "cuenta_contable" in columnas %}<th class="w-contable">Cuenta contable</th>{% endif %}
                     {% if "ceco" in columnas %}<th class="w-ceco">CECO</th>{% endif %}
-                    {% if "provincia_estado" in columnas %}<th class="w-prov">Provincia /<br>Estado</th>{% endif %}
+                    {% if "provincia_estado" in columnas %}<th class="w-prov">Provincia / Estado</th>{% endif %}
                     {% if "tipo_servicio" in columnas %}<th class="w-tipo">Tipo</th>{% endif %}
                     {% if "servicio" in columnas %}<th class="w-servicio">Servicio</th>{% endif %}
                     {% if "tecnico" in columnas %}<th class="w-tecnico">Técnico</th>{% endif %}
                     {% if "observaciones" in columnas %}<th class="w-obs">Observaciones</th>{% endif %}
-                    {% if "valor_pago_tecnico" in columnas %}<th class="w-monto">Valor pago<br>técnico</th>{% endif %}
+                    {% if "valor_pago_tecnico" in columnas %}<th class="w-monto">Valor pago técnico</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
                 {% for s in servicios %}
                 <tr>
-                    {% if "numero" in columnas %}<td class="celda-numero">{{ s.numero|default:"-" }}</td>{% endif %}
-                    {% if "fecha_finalizacion" in columnas %}<td class="celda-fecha">{{ s.fecha_finalizacion|date:"d/m/Y H:i"|default:"-" }}</td>{% endif %}
-                    {% if "cuenta" in columnas %}<td class="celda-cuenta">{{ s.cuenta|default:"-" }}</td>{% endif %}
-                    {% if "cuenta_contable" in columnas %}<td class="celda-contable">{{ s.cuenta_contable|default:"-" }}</td>{% endif %}
-                    {% if "ceco" in columnas %}<td class="celda-ceco">{{ s.ceco|default:"-" }}</td>{% endif %}
-                    {% if "provincia_estado" in columnas %}<td class="celda-provincia">{{ s.provincia_estado|default:"-" }}</td>{% endif %}
-                    {% if "tipo_servicio" in columnas %}<td class="celda-tipo">{{ s.tipo_servicio|default:"-" }}</td>{% endif %}
-                    {% if "servicio" in columnas %}<td class="celda-servicio">{{ s.servicio|default:"-" }}</td>{% endif %}
-                    {% if "tecnico" in columnas %}<td class="celda-tecnico">{{ s.tecnico_pdf|default:"-" }}</td>{% endif %}
-                    {% if "observaciones" in columnas %}<td class="obs">{{ s.observaciones|default:"-" }}</td>{% endif %}
-                    {% if "valor_pago_tecnico" in columnas %}<td class="monto">${{ s.valor_pago_tecnico|default:0|floatformat:0|intcomma }}</td>{% endif %}
+                    {% if "numero" in columnas %}
+                        <td class="celda-mini">{{ s.numero|default:"-" }}</td>
+                    {% endif %}
+
+                    {% if "fecha_finalizacion" in columnas %}
+                        <td class="celda-mini">{{ s.fecha_finalizacion|date:"d/m/Y H:i"|default:"-" }}</td>
+                    {% endif %}
+
+                    {% if "cuenta" in columnas %}
+                        <td>{{ s.cuenta|default:"-" }}</td>
+                    {% endif %}
+
+                    {% if "cuenta_contable" in columnas %}
+                        <td class="celda-mini">{{ s.cuenta_contable|default:"-" }}</td>
+                    {% endif %}
+
+                    {% if "ceco" in columnas %}
+                        <td class="celda-mini">
+                            {% if s.ceco %}
+                                {{ s.ceco.ceco }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    {% endif %}
+
+                    {% if "provincia_estado" in columnas %}
+                        <td class="celda-mini">{{ s.provincia_estado|default:"-" }}</td>
+                    {% endif %}
+
+                    {% if "tipo_servicio" in columnas %}
+                        <td class="celda-mini">{{ s.tipo_servicio|default:"-" }}</td>
+                    {% endif %}
+
+                    {% if "servicio" in columnas %}
+                        <td>{{ s.servicio|default:"-" }}</td>
+                    {% endif %}
+
+                    {% if "tecnico" in columnas %}
+                        <td>{{ s.tecnico_pdf|default:s.tecnico|default:"-" }}</td>
+                    {% endif %}
+
+                    {% if "observaciones" in columnas %}
+                        <td class="obs">{{ s.observaciones|default:"-" }}</td>
+                    {% endif %}
+
+                    {% if "valor_pago_tecnico" in columnas %}
+                        <td class="monto">${{ s.valor_pago_tecnico|default:0|floatformat:0|intcomma }}</td>
+                    {% endif %}
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="{{ cantidad_columnas }}" style="text-align:center;">
+                    <td colspan="{{ cantidad_columnas }}" class="center">
                         No hay servicios para los filtros seleccionados.
                     </td>
                 </tr>

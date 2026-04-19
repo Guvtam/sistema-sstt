@@ -2,35 +2,101 @@ import json
 import logging
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
+from django.views.decorators.http import require_POST
+
 
 import pandas as pd
+from django.contrib import messages
 from django.db import transaction
 from django.db.models import Count, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.template.loader import render_to_string
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from xhtml2pdf import pisa
-from django.contrib import messages
 
-from .models import CECO, CargaMensual, Contratista, ServicioTecnico, Tecnico, CuentaB2B
+from .models import (
+    AliasContratista,
+    AliasTecnico,
+    ArchivoCarga,
+    CargaMensual,
+    CECO,
+    Contratista,
+    CuentaB2B,
+    ObservacionImportacion,
+    ServicioTecnico,
+    ServicioTecnicoRaw,
+    Tecnico,
+)
 
 logger = logging.getLogger(__name__)
 
 
-# ==============================
-# FUNCIONES AUXILIARES
-# ==============================
+# =========================================================
+# HELPERS GENERALES
+# =========================================================
+
+COLUMNAS_ESPERADAS = [
+    "Número",
+    "Fecha de Creación",
+    "Fecha de modificación",
+    "Fecha de la visita",
+    "Fecha de finalizacion",
+    "Cuenta",
+    "Teléfono",
+    "Tecnico",
+    "Dirección",
+    "Provincia-Estado",
+    "Localidad",
+    "Tipo de Servicio",
+    "Servicio",
+    "Observaciones (Insumos)",
+    "Estado",
+    "Usuario",
+    "Valor",
+    "Costo mano de obra",
+    "Fecha de pago",
+    "Valor pago técnico",
+    "Tiempo de Trabajo Total",
+]
+
+
+def recalcular_estado_carga(archivo):
+    """
+    Recalcula el estado de la carga en base a observaciones pendientes reales.
+    """
+
+    tipos_revision_real = ["contratista_no_encontrado", "tecnico_sin_match"]
+
+    observaciones_pendientes = ObservacionImportacion.objects.filter(
+        raw__archivo_carga=archivo,
+        tipo__in=tipos_revision_real,
+        estado="pendiente"
+    ).count()
+
+    archivo.filas_con_observacion = observaciones_pendientes
+
+    if observaciones_pendientes > 0:
+        archivo.estado = "procesado_con_observaciones"
+    else:
+        archivo.estado = "procesado"
+
+    archivo.save(update_fields=[
+        "filas_con_observacion",
+        "estado",
+        "fecha_actualizacion",
+    ])
+
 
 def truncar_texto(valor, largo):
     if valor is None:
         return None
     return str(valor).strip()[:largo]
+
 
 def quitar_tildes(texto):
     if not texto:
@@ -41,25 +107,32 @@ def quitar_tildes(texto):
     )
 
 
-def normalizar_nombre(valor):
+def normalizar_texto_base(valor):
     if not valor:
         return ""
-
     valor = quitar_tildes(valor)
     valor = valor.upper().strip()
     valor = valor.replace(".", "")
+    valor = re.sub(r"\s+", " ", valor)
+    return valor.strip()
+
+
+def normalizar_nombre_persona(valor):
+    valor = normalizar_texto_base(valor)
+
+    if not valor:
+        return ""
+
+    valor = re.sub(r"^T\s*INTERNO\s*-?\s*", "", valor)
+    valor = re.sub(r"^T\s*EXTERNO\s*-?\s*", "", valor)
 
     valor = re.sub(r"\bEIRL\b", "", valor)
     valor = re.sub(r"\bSPA\b", "", valor)
     valor = re.sub(r"\bLTDA\b", "", valor)
     valor = re.sub(r"\bLIMITADA\b", "", valor)
 
-    valor = re.sub(r"^T\s*INTERNO\s*", "", valor)
-    valor = re.sub(r"^T\s*EXTERNO\s*", "", valor)
-
     valor = re.sub(r"[^A-Z0-9 ]", "", valor)
     valor = re.sub(r"\s+", " ", valor)
-
     return valor.strip()
 
 
@@ -78,6 +151,45 @@ def limpiar_nombre_tecnico(valor):
     return valor.strip()
 
 
+def detectar_tipo_tecnico(texto_original):
+    if not texto_original:
+        return None
+
+    texto = str(texto_original).upper()
+
+    if "T. EXTERNO" in texto or "T EXTERNO" in texto:
+        return "contratista"
+
+    if "T. INTERNO" in texto or "T INTERNO" in texto:
+        return "interno"
+
+    return None
+
+
+def normalizar_empresa(valor):
+    valor = normalizar_texto_base(valor)
+    if not valor:
+        return ""
+
+    valor = re.sub(r"[^A-Z0-9 ]", "", valor)
+    valor = re.sub(r"\s+", " ", valor)
+    return valor.strip()
+
+
+def normalizar_rut(valor):
+    if not valor:
+        return ""
+
+    valor = str(valor).strip().upper()
+    valor = valor.replace(".", "").replace(" ", "")
+    valor = re.sub(r"[^0-9K\-]", "", valor)
+
+    if "-" not in valor and len(valor) >= 2:
+        valor = f"{valor[:-1]}-{valor[-1]}"
+
+    return valor.strip()
+
+
 def normalizar_cuenta(valor):
     if valor is None:
         return ""
@@ -87,15 +199,12 @@ def normalizar_cuenta(valor):
     if valor in ["", "NAN", "NONE", "NULL"]:
         return ""
 
-    # quitar todos los espacios
     valor = re.sub(r"\s+", "", valor)
 
-    # FIR-005C / FIR005C / FIR_005C -> FIR-005C
     match_fir = re.match(r"^FIR[-_]?([A-Z0-9]+)$", valor)
     if match_fir:
         return f"FIR-{match_fir.group(1)}"
 
-    # NEW-SF_99 / NEWSF99 / NEW-SF-99 / NEWSF_99 -> NEW-SF_99
     match_new = re.match(r"^NEW[-_]?SF[-_]?([A-Z0-9]+)$", valor)
     if match_new:
         return f"NEW-SF_{match_new.group(1)}"
@@ -112,23 +221,15 @@ def extraer_cuenta_contable(valor):
     if texto in ["", "NAN", "NONE", "NULL"]:
         return ""
 
-    # Buscar FIR
     match = re.search(r"FIR\s*-?\s*[A-Z0-9]+", texto)
     if match:
         return normalizar_cuenta(match.group(0))
 
-    # Buscar NEW-SF
     match = re.search(r"NEW\s*-?\s*SF[_-]?\s*[A-Z0-9]+", texto)
     if match:
         return normalizar_cuenta(match.group(0))
 
     return ""
-
-
-def clasificar_b2b(cuenta, cuentas_b2b_set):
-    cuenta_extraida = extraer_cuenta_contable(cuenta)
-    cuenta_normalizada = normalizar_cuenta(cuenta_extraida)
-    return cuenta_normalizada in cuentas_b2b_set, cuenta_extraida
 
 
 def convertir_fecha(valor):
@@ -177,6 +278,10 @@ def convertir_fecha(valor):
                     return None
                 fecha = fecha.to_pydatetime()
 
+        # limpiar fecha basura común
+        if fecha.year <= 1900:
+            return None
+
         if timezone.is_naive(fecha):
             fecha = timezone.make_aware(fecha)
 
@@ -186,7 +291,7 @@ def convertir_fecha(valor):
         return None
 
 
-def limpiar_fecha(valor):
+def limpiar_entero_monetario(valor):
     if valor is None:
         return None
 
@@ -196,1235 +301,1511 @@ def limpiar_fecha(valor):
     except Exception:
         pass
 
-    if isinstance(valor, pd.Timestamp):
-        valor = valor.to_pydatetime()
+    texto = str(valor).strip()
 
-    if isinstance(valor, datetime):
-        if timezone.is_naive(valor):
-            return timezone.make_aware(valor)
-        return valor
+    if texto.upper() in ["", "NAN", "NONE", "NULL"]:
+        return None
+
+    texto = texto.replace("$", "").replace(" ", "")
+
+    # casos tipo 21.000.00 -> 21000
+    if texto.count(".") >= 2 and texto.endswith(".00"):
+        texto = texto[:-3].replace(".", "")
+
+    # casos tipo 25.000
+    elif texto.count(".") >= 1 and "," not in texto:
+        partes = texto.split(".")
+        if len(partes[-1]) == 3:
+            texto = "".join(partes)
+
+    texto = texto.replace(",", "")
+
+    try:
+        return int(Decimal(texto))
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def limpiar_decimal(valor):
+    entero = limpiar_entero_monetario(valor)
+    if entero is None:
+        return None
+    return Decimal(entero)
+
+
+def leer_archivo_excel_generico(archivo):
+    nombre = archivo.name.lower()
+
+    if nombre.endswith(".xls"):
+        tablas = pd.read_html(archivo)
+        if not tablas:
+            raise ValueError("No se encontraron tablas en el archivo .xls")
+        df = tablas[0]
+    else:
+        df = pd.read_excel(archivo)
+
+    df.columns = [str(c).strip() for c in df.columns]
+    return df
+
+
+def obtener_dict_cuentas_b2b():
+    cuentas = CuentaB2B.objects.filter(activo=True)
+    return {c.cuenta_normalizada: c for c in cuentas}
+
+
+def clasificar_b2b_desde_cuenta(cuenta_texto, cuentas_b2b_dict):
+    cuenta_contable = extraer_cuenta_contable(cuenta_texto)
+    cuenta_normalizada = normalizar_cuenta(cuenta_contable)
+    es_b2b = cuenta_normalizada in cuentas_b2b_dict
+    return es_b2b, cuenta_normalizada
+
+
+def crear_observacion(raw, tipo, detalle, valor_detectado=None, sugerencia=None):
+    return ObservacionImportacion.objects.create(
+        raw=raw,
+        tipo=tipo,
+        detalle=detalle,
+        valor_detectado=valor_detectado,
+        sugerencia=sugerencia,
+    )
+
+
+# =========================================================
+# MATCHING DE ENTIDADES
+# =========================================================
+
+def buscar_tecnico_por_nombre(nombre_limpio):
+    if not nombre_limpio:
+        return None
+
+    normalizado = normalizar_nombre_persona(nombre_limpio)
+
+    alias = AliasTecnico.objects.filter(
+        alias_normalizado=normalizado,
+        activo=True
+    ).select_related("tecnico").first()
+
+    if alias:
+        return alias.tecnico
+
+    return Tecnico.objects.filter(
+        nombre_normalizado=normalizado,
+        activo=True
+    ).first()
+
+
+def buscar_contratista_por_nombre(nombre_limpio):
+    if not nombre_limpio:
+        return None
+
+    normalizado = normalizar_nombre_persona(nombre_limpio)
+
+    alias = AliasContratista.objects.filter(
+        alias_normalizado=normalizado,
+        activo=True
+    ).select_related("contratista").first()
+
+    if alias:
+        return alias.contratista
+
+    exactos = Contratista.objects.filter(
+        nombre_normalizado=normalizado,
+        activo=True
+    )
+
+    if exactos.count() == 1:
+        return exactos.first()
 
     return None
 
 
+def resolver_tecnico_y_contratista(nombre_tecnico_original, raw):
+    """
+    Resuelve técnico y contratista con lógica segura.
+    No crea contratista automáticamente.
+    """
+    if not nombre_tecnico_original or str(nombre_tecnico_original).strip() == "":
+        return None, None, "sin_tecnico"
+
+    tipo_detectado = detectar_tipo_tecnico(nombre_tecnico_original)
+    nombre_limpio = limpiar_nombre_tecnico(nombre_tecnico_original)
+    nombre_normalizado = normalizar_nombre_persona(nombre_limpio)
+
+    tecnico = buscar_tecnico_por_nombre(nombre_limpio)
+    contratista = None
+
+    if tecnico:
+        if tecnico.tipo == "contratista":
+            contratista = tecnico.contratista
+        return tecnico, contratista, tipo_detectado
+
+    # si no existe técnico, intentar resolver contratista por nombre
+    if tipo_detectado == "contratista":
+        contratista = buscar_contratista_por_nombre(nombre_limpio)
+
+        if contratista:
+            tecnico = Tecnico.objects.create(
+                nombre=nombre_limpio,
+                tipo="contratista",
+                categoria="remoto",
+                contratista=contratista,
+                activo=True,
+                requiere_revision=False,
+            )
+
+            AliasTecnico.objects.get_or_create(
+                alias=nombre_limpio,
+                defaults={
+                    "alias_normalizado": nombre_normalizado,
+                    "tecnico": tecnico,
+                    "activo": True,
+                }
+            )
+
+            return tecnico, contratista, tipo_detectado
+
+        # esto sí queda en revisión
+        tecnico = Tecnico.objects.create(
+            nombre=nombre_limpio,
+            tipo="contratista",
+            categoria="remoto",
+            contratista=None,
+            activo=True,
+            requiere_revision=True,
+        )
+
+        crear_observacion(
+            raw,
+            "contratista_no_encontrado",
+            "No se pudo vincular el técnico externo a un contratista existente.",
+            valor_detectado=nombre_tecnico_original,
+            sugerencia=nombre_limpio,
+        )
+
+        return tecnico, None, tipo_detectado
+
+    # interno o no detectado: crear técnico normal
+    tecnico = Tecnico.objects.create(
+        nombre=nombre_limpio,
+        tipo="interno" if tipo_detectado != "contratista" else "contratista",
+        categoria="remoto",
+        activo=True,
+        requiere_revision=False,
+    )
+
+    AliasTecnico.objects.get_or_create(
+        alias=nombre_limpio,
+        defaults={
+            "alias_normalizado": nombre_normalizado,
+            "tecnico": tecnico,
+            "activo": True,
+        }
+    )
+
+    return tecnico, None, tipo_detectado
 
 
+def buscar_ceco_por_cuenta(cuenta_contable):
+    if not cuenta_contable:
+        return None
+    return CECO.objects.filter(
+        cuenta_normalizada=cuenta_contable,
+        activo=True
+    ).first()
+
+
+# =========================================================
+# PROCESAMIENTO RAW -> FINAL
+# =========================================================
+
+def guardar_dataframe_en_raw(df, archivo_carga):
+    filas = []
+
+    for idx, row in df.iterrows():
+        data = {}
+        for col in df.columns:
+            valor = row[col]
+            if isinstance(valor, pd.Timestamp):
+                valor = valor.isoformat()
+            elif pd.isna(valor):
+                valor = None
+            else:
+                valor = str(valor).strip() if not isinstance(valor, (int, float)) else valor
+
+            data[str(col).strip()] = valor
+
+        numero_ot = None
+        try:
+            numero_ot = int(float(row.get("Número"))) if row.get("Número") not in [None, ""] else None
+        except Exception:
+            pass
+
+        tecnico_texto = row.get("Tecnico")
+        cuenta_texto = row.get("Cuenta")
+
+        filas.append(
+            ServicioTecnicoRaw(
+                archivo_carga=archivo_carga,
+                fila_numero=idx + 1,
+                data=data,
+                numero_ot=numero_ot,
+                tecnico_texto=truncar_texto(tecnico_texto, 200) if tecnico_texto else None,
+                tecnico_normalizado=normalizar_nombre_persona(limpiar_nombre_tecnico(tecnico_texto)) if tecnico_texto else "",
+                cuenta_texto=truncar_texto(cuenta_texto, 400) if cuenta_texto else None,
+                cuenta_contable=extraer_cuenta_contable(cuenta_texto),
+                tipo_servicio=truncar_texto(row.get("Tipo de Servicio"), 150),
+                fecha_visita=convertir_fecha(row.get("Fecha de la visita")),
+                fecha_finalizacion=convertir_fecha(row.get("Fecha de finalizacion")),
+                valor_pago_original_texto=str(row.get("Valor pago técnico")).strip() if row.get("Valor pago técnico") is not None else None,
+                valor_pago_tecnico=limpiar_entero_monetario(row.get("Valor pago técnico")),
+            )
+        )
+
+    ServicioTecnicoRaw.objects.bulk_create(filas, batch_size=500)
+    archivo_carga.total_filas = len(filas)
+    archivo_carga.save(update_fields=["total_filas", "fecha_actualizacion"])
+
+
+def procesar_raw_a_servicio(raw, cuentas_b2b_dict):
+    data = raw.data or {}
+
+    numero = raw.numero_ot
+    fecha_creacion_origen = convertir_fecha(data.get("Fecha de Creación"))
+    fecha_modificacion = convertir_fecha(data.get("Fecha de modificación"))
+    fecha_visita = convertir_fecha(data.get("Fecha de la visita"))
+    fecha_finalizacion = convertir_fecha(data.get("Fecha de finalizacion"))
+    fecha_pago = convertir_fecha(data.get("Fecha de pago"))
+
+    cuenta = truncar_texto(data.get("Cuenta"), 400)
+    telefono = truncar_texto(data.get("Teléfono"), 100)
+    tecnico_origen = data.get("Tecnico")
+    tecnico_texto = truncar_texto(tecnico_origen, 150)
+
+    if not tecnico_texto or str(tecnico_texto).strip() == "":
+        tecnico_texto = "Sin técnico"
+    direccion = truncar_texto(data.get("Dirección"), 300)
+    provincia_estado = truncar_texto(data.get("Provincia-Estado"), 150)
+    localidad = truncar_texto(data.get("Localidad"), 150)
+    tipo_servicio = truncar_texto(data.get("Tipo de Servicio"), 150)
+    servicio = truncar_texto(data.get("Servicio"), 300)
+    observaciones = data.get("Observaciones (Insumos)")
+    estado = truncar_texto(data.get("Estado"), 100)
+    usuario = truncar_texto(data.get("Usuario"), 150)
+    tiempo_trabajo_total = truncar_texto(data.get("Tiempo de Trabajo Total"), 100)
+
+    valor = limpiar_decimal(data.get("Valor"))
+    costo_mano_obra = limpiar_decimal(data.get("Costo mano de obra"))
+    valor_pago_tecnico = limpiar_entero_monetario(data.get("Valor pago técnico"))
+    valor_pago_original = valor_pago_tecnico
+
+    es_b2b, cuenta_contable = clasificar_b2b_desde_cuenta(cuenta, cuentas_b2b_dict)
+    ceco = buscar_ceco_por_cuenta(cuenta_contable)
+
+    tecnico_obj, contratista, tipo_detectado = resolver_tecnico_y_contratista(tecnico_texto, raw)
+
+    requiere_revision = False
+
+    if not fecha_finalizacion and data.get("Fecha de finalizacion"):
+        crear_observacion(
+            raw,
+            "fecha_invalida",
+            "No se pudo convertir la fecha de finalización.",
+            valor_detectado=str(data.get("Fecha de finalizacion")),
+        )
+        requiere_revision = True
+
+    if valor_pago_tecnico is None and data.get("Valor pago técnico") not in [None, "", "0", "0.00"]:
+        crear_observacion(
+            raw,
+            "monto_invalido",
+            "No se pudo convertir el valor pago técnico.",
+            valor_detectado=str(data.get("Valor pago técnico")),
+        )
+        requiere_revision = True
+
+    if not cuenta_contable and cuenta:
+        crear_observacion(
+            raw,
+            "cuenta_invalida",
+            "No se pudo extraer una cuenta contable válida.",
+            valor_detectado=cuenta,
+        )
+        requiere_revision = True
+
+    if tecnico_obj and tecnico_obj.requiere_revision:
+        requiere_revision = True
+
+    servicio_existente = ServicioTecnico.objects.filter(raw=raw).first()
+
+    if servicio_existente:
+        estado_pago_actual = servicio_existente.estado_pago
+        servicio_existente.delete()
+    else:
+        estado_pago_actual = "aprobado"
+
+    servicio_final = ServicioTecnico.objects.create(
+        carga=raw.archivo_carga.carga_mensual,
+        archivo_carga=raw.archivo_carga,
+        raw=raw,
+        contratista=contratista,
+        numero=numero,
+        fecha_creacion_origen=fecha_creacion_origen,
+        fecha_modificacion=fecha_modificacion,
+        fecha_visita=fecha_visita,
+        fecha_finalizacion=fecha_finalizacion,
+        cuenta=cuenta,
+        telefono=telefono,
+        tecnico=tecnico_texto,
+        tecnico_obj=tecnico_obj,
+        direccion=direccion,
+        provincia_estado=provincia_estado,
+        localidad=localidad,
+        tipo_servicio=tipo_servicio,
+        servicio=servicio,
+        observaciones=observaciones,
+        estado=estado,
+        usuario=usuario,
+        valor=valor,
+        costo_mano_obra=costo_mano_obra,
+        fecha_pago=fecha_pago,
+        valor_pago_original=valor_pago_original,
+        valor_pago_tecnico=valor_pago_tecnico,
+        tiempo_trabajo_total=tiempo_trabajo_total,
+        cuenta_contable=cuenta_contable,
+        ceco=ceco,
+        estado_pago=estado_pago_actual,
+        es_b2b=es_b2b,
+        requiere_revision=requiere_revision,
+    )
+
+    raw.estado = "revision" if requiere_revision else "publicado"
+    raw.procesado = True
+    raw.publicado = not requiere_revision
+    raw.requiere_revision = requiere_revision
+    raw.error = None
+    raw.save(update_fields=[
+        "estado", "procesado", "publicado", "requiere_revision", "error", "fecha_actualizacion"
+    ])
+
+    return servicio_final
+
+
+def recalcular_incidencias_para_archivo(archivo_carga):
+    servicios = ServicioTecnico.objects.filter(
+        archivo_carga=archivo_carga
+    ).exclude(
+        fecha_finalizacion__isnull=True
+    )
+
+    # Solo servicios con técnico asignado real
+    servicios_validos = servicios.exclude(
+        tecnico__isnull=True
+    ).exclude(
+        tecnico=""
+    ).exclude(
+        tecnico="Sin técnico"
+    )
+
+    # =========================
+    # Incidencias por día
+    # =========================
+    agrupados = {}
+    for s in servicios_validos:
+        clave = (
+            s.cuenta_contable or "",
+            s.fecha_finalizacion.date() if s.fecha_finalizacion else None
+        )
+        agrupados[clave] = agrupados.get(clave, 0) + 1
+
+    for s in servicios:
+        if not s.tecnico or str(s.tecnico).strip() in ["", "Sin técnico"]:
+            s.numero_incidencias_dia = 0
+        else:
+            clave = (
+                s.cuenta_contable or "",
+                s.fecha_finalizacion.date() if s.fecha_finalizacion else None
+            )
+            s.numero_incidencias_dia = agrupados.get(clave, 0)
+
+    ServicioTecnico.objects.bulk_update(servicios, ["numero_incidencias_dia"], batch_size=500)
+
+    # =========================
+    # Incidencias 60 días
+    # =========================
+    servicios_lista = list(servicios)
+    for s in servicios_lista:
+        if (
+            not s.fecha_finalizacion
+            or not s.cuenta_contable
+            or not s.tecnico
+            or str(s.tecnico).strip() in ["", "Sin técnico"]
+        ):
+            s.numero_incidencias_60_dias = 0
+            continue
+
+        fecha_desde = s.fecha_finalizacion - timedelta(days=60)
+
+        cantidad = ServicioTecnico.objects.filter(
+            cuenta_contable=s.cuenta_contable,
+            fecha_finalizacion__gte=fecha_desde,
+            fecha_finalizacion__lte=s.fecha_finalizacion,
+        ).exclude(
+            tecnico__isnull=True
+        ).exclude(
+            tecnico=""
+        ).exclude(
+            tecnico="Sin técnico"
+        ).count()
+
+        s.numero_incidencias_60_dias = cantidad
+
+    ServicioTecnico.objects.bulk_update(servicios_lista, ["numero_incidencias_60_dias"], batch_size=200)
+
+
+def procesar_archivo_carga(archivo_carga):
+    archivo_carga.estado = "procesando"
+    archivo_carga.mensaje = None
+    archivo_carga.save(update_fields=["estado", "mensaje", "fecha_actualizacion"])
+
+    cuentas_b2b_dict = obtener_dict_cuentas_b2b()
+
+    raws = ServicioTecnicoRaw.objects.filter(archivo_carga=archivo_carga, procesado=False).order_by("fila_numero")
+
+    procesadas = 0
+    publicadas = 0
+    observadas = 0
+
+    for raw in raws:
+        try:
+            servicio = procesar_raw_a_servicio(raw, cuentas_b2b_dict)
+            procesadas += 1
+
+            if servicio:
+                if servicio.requiere_revision:
+                    observadas += 1
+                else:
+                    publicadas += 1
+            else:
+                observadas += 1
+
+        except Exception as e:
+            logger.exception("Error procesando raw %s", raw.id)
+            raw.estado = "error"
+            raw.procesado = True
+            raw.error = str(e)
+            raw.requiere_revision = True
+            raw.save(update_fields=["estado", "procesado", "error", "requiere_revision", "fecha_actualizacion"])
+
+            crear_observacion(
+                raw,
+                "otro",
+                "Error no controlado durante el procesamiento.",
+                valor_detectado=str(e),
+            )
+            procesadas += 1
+            observadas += 1
+
+    recalcular_incidencias_para_archivo(archivo_carga)
+
+    tipos_revision_real = ["contratista_no_encontrado", "tecnico_sin_match", "tecnico_ambiguo", "contratista_ambiguo"]
+
+    observaciones_reales = ObservacionImportacion.objects.filter(
+        raw__archivo_carga=archivo_carga,
+        tipo__in=tipos_revision_real,
+        estado="pendiente"
+    ).count()
+
+    archivo_carga.filas_procesadas = procesadas
+    archivo_carga.filas_publicadas = publicadas
+    archivo_carga.filas_con_observacion = observaciones_reales
+    archivo_carga.estado = "procesado_con_observaciones" if observaciones_reales > 0 else "procesado"
+    archivo_carga.mensaje = (
+        f"Procesadas: {procesadas} | "
+        f"Publicadas: {publicadas} | "
+        f"Observaciones reales: {observaciones_reales}"
+    )
+
+    recalcular_incidencias_para_archivo(archivo_carga)
+
+    tipos_revision_real = ["contratista_no_encontrado", "tecnico_sin_match"]
+
+    observaciones_reales = ObservacionImportacion.objects.filter(
+        raw__archivo_carga=archivo_carga,
+        tipo__in=tipos_revision_real,
+        estado="pendiente"
+    ).count()
+
+    archivo_carga.filas_procesadas = procesadas
+    archivo_carga.filas_publicadas = publicadas
+    archivo_carga.filas_con_observacion = observaciones_reales
+    archivo_carga.estado = "procesado_con_observaciones" if observaciones_reales > 0 else "procesado"
+    archivo_carga.mensaje = (
+        f"Procesadas: {procesadas} | "
+        f"Publicadas: {publicadas} | "
+        f"Observaciones reales: {observaciones_reales}"
+    )
+    archivo_carga.save(update_fields=[
+        "filas_procesadas",
+        "filas_publicadas",
+        "filas_con_observacion",
+        "estado",
+        "mensaje",
+        "fecha_actualizacion",
+    ])    
+
+
+# =========================================================
+# RESÚMENES
+# =========================================================
 
 def obtener_resumen_contratista(servicios):
+    servicios = list(servicios)
+
+    # Totales generales por número OT
     numeros_totales = {s.numero for s in servicios if s.numero is not None}
 
+    # Preventivas / Correctivas
     numeros_preventivas = {
         s.numero for s in servicios
         if s.numero is not None and s.tipo_servicio and "PREVENTIV" in s.tipo_servicio.upper()
     }
-
     numeros_correctivas = {
         s.numero for s in servicios
         if s.numero is not None and s.tipo_servicio and "CORRECTIV" in s.tipo_servicio.upper()
     }
 
+    # Estados de pago
     numeros_aprobado = {
         s.numero for s in servicios
         if s.numero is not None and s.estado_pago == "aprobado"
     }
-
     numeros_revision = {
         s.numero for s in servicios
         if s.numero is not None and s.estado_pago == "revision"
     }
-
     numeros_rechazado = {
         s.numero for s in servicios
         if s.numero is not None and s.estado_pago == "rechazado"
     }
 
-    numeros_aprobado_preventivas = {
-        s.numero for s in servicios
-        if s.numero is not None
-        and s.estado_pago == "aprobado"
-        and s.tipo_servicio
-        and "PREVENTIV" in s.tipo_servicio.upper()
-    }
-
-    numeros_aprobado_correctivas = {
-        s.numero for s in servicios
-        if s.numero is not None
-        and s.estado_pago == "aprobado"
-        and s.tipo_servicio
-        and "CORRECTIV" in s.tipo_servicio.upper()
-    }
-
-    numeros_revision_preventivas = {
-        s.numero for s in servicios
-        if s.numero is not None
-        and s.estado_pago == "revision"
-        and s.tipo_servicio
-        and "PREVENTIV" in s.tipo_servicio.upper()
-    }
-
-    numeros_revision_correctivas = {
-        s.numero for s in servicios
-        if s.numero is not None
-        and s.estado_pago == "revision"
-        and s.tipo_servicio
-        and "CORRECTIV" in s.tipo_servicio.upper()
-    }
-
-    numeros_rechazado_preventivas = {
-        s.numero for s in servicios
-        if s.numero is not None
-        and s.estado_pago == "rechazado"
-        and s.tipo_servicio
-        and "PREVENTIV" in s.tipo_servicio.upper()
-    }
-
-    numeros_rechazado_correctivas = {
-        s.numero for s in servicios
-        if s.numero is not None
-        and s.estado_pago == "rechazado"
-        and s.tipo_servicio
-        and "CORRECTIV" in s.tipo_servicio.upper()
-    }
-
+    # B2B / B2C
     numeros_b2b = {
         s.numero for s in servicios
         if s.numero is not None and s.es_b2b
     }
-
     numeros_b2c = {
         s.numero for s in servicios
         if s.numero is not None and not s.es_b2b
     }
-    numeros_no_cobrado = {
-        s.numero for s in servicios
-        if s.numero is not None and s.estado_pago == "no_cobrado"
-    }
-    numeros_no_cobrado_preventivas = {
-        s.numero for s in servicios
-        if s.numero is not None
-        and s.estado_pago == "no_cobrado"
-        and s.tipo_servicio
-        and "PREVENTIV" in s.tipo_servicio.upper()
-    }
-    numeros_no_cobrado_correctivas = {
-        s.numero for s in servicios
-        if s.numero is not None
-        and s.estado_pago == "no_cobrado"
-        and s.tipo_servicio
-        and "CORRECTIV" in s.tipo_servicio.upper()
-    }
-    monto_no_cobrado = Decimal(sum(
-        Decimal(s.valor_pago_tecnico or 0)
-        for s in servicios if s.estado_pago == "no_cobrado"
-    ))
 
-    
-
+    # Montos
     monto_total = Decimal(sum(Decimal(s.valor_pago_tecnico or 0) for s in servicios))
-    monto_aprobado = Decimal(sum(Decimal(s.valor_pago_tecnico or 0) for s in servicios if s.estado_pago == "aprobado"))
-    monto_revision = Decimal(sum(Decimal(s.valor_pago_tecnico or 0) for s in servicios if s.estado_pago == "revision"))
-    monto_rechazado = Decimal(sum(Decimal(s.valor_pago_tecnico or 0) for s in servicios if s.estado_pago == "rechazado"))
+    monto_aprobado = Decimal(sum(
+        Decimal(s.valor_pago_tecnico or 0)
+        for s in servicios if s.estado_pago == "aprobado"
+    ))
+    monto_revision = Decimal(sum(
+        Decimal(s.valor_pago_tecnico or 0)
+        for s in servicios if s.estado_pago == "revision"
+    ))
+    monto_rechazado = Decimal(sum(
+        Decimal(s.valor_pago_tecnico or 0)
+        for s in servicios if s.estado_pago == "rechazado"
+    ))
 
     monto_preventivas = Decimal(sum(
         Decimal(s.valor_pago_tecnico or 0)
-        for s in servicios
-        if s.tipo_servicio and "PREVENTIV" in s.tipo_servicio.upper()
+        for s in servicios if s.tipo_servicio and "PREVENTIV" in s.tipo_servicio.upper()
     ))
-
     monto_correctivas = Decimal(sum(
         Decimal(s.valor_pago_tecnico or 0)
-        for s in servicios
-        if s.tipo_servicio and "CORRECTIV" in s.tipo_servicio.upper()
+        for s in servicios if s.tipo_servicio and "CORRECTIV" in s.tipo_servicio.upper()
     ))
 
-    monto_b2b = Decimal(sum(Decimal(s.valor_pago_tecnico or 0) for s in servicios if s.es_b2b))
-    monto_b2c = Decimal(sum(Decimal(s.valor_pago_tecnico or 0) for s in servicios if not s.es_b2b))
+    monto_b2b = Decimal(sum(
+        Decimal(s.valor_pago_tecnico or 0)
+        for s in servicios if s.es_b2b
+    ))
+    monto_b2c = Decimal(sum(
+        Decimal(s.valor_pago_tecnico or 0)
+        for s in servicios if not s.es_b2b
+    ))
 
     iva_19 = monto_total * Decimal("0.19")
     monto_total_con_iva = monto_total + iva_19
 
+    # Resumen para tabla de estados
+    resumen_estados = {
+        "aprobado": {
+            "cantidad": len(numeros_aprobado),
+            "preventivas": len({
+                s.numero for s in servicios
+                if s.numero is not None and s.estado_pago == "aprobado"
+                and s.tipo_servicio and "PREVENTIV" in s.tipo_servicio.upper()
+            }),
+            "correctivas": len({
+                s.numero for s in servicios
+                if s.numero is not None and s.estado_pago == "aprobado"
+                and s.tipo_servicio and "CORRECTIV" in s.tipo_servicio.upper()
+            }),
+            "monto": monto_aprobado,
+        },
+        "revision": {
+            "cantidad": len(numeros_revision),
+            "preventivas": len({
+                s.numero for s in servicios
+                if s.numero is not None and s.estado_pago == "revision"
+                and s.tipo_servicio and "PREVENTIV" in s.tipo_servicio.upper()
+            }),
+            "correctivas": len({
+                s.numero for s in servicios
+                if s.numero is not None and s.estado_pago == "revision"
+                and s.tipo_servicio and "CORRECTIV" in s.tipo_servicio.upper()
+            }),
+            "monto": monto_revision,
+        },
+        "rechazado": {
+            "cantidad": len(numeros_rechazado),
+            "preventivas": len({
+                s.numero for s in servicios
+                if s.numero is not None and s.estado_pago == "rechazado"
+                and s.tipo_servicio and "PREVENTIV" in s.tipo_servicio.upper()
+            }),
+            "correctivas": len({
+                s.numero for s in servicios
+                if s.numero is not None and s.estado_pago == "rechazado"
+                and s.tipo_servicio and "CORRECTIV" in s.tipo_servicio.upper()
+            }),
+            "monto": monto_rechazado,
+        },
+    }
+
     return {
         "total_mantenciones": len(numeros_totales),
+
         "total_preventivas": len(numeros_preventivas),
         "total_correctivas": len(numeros_correctivas),
+
         "cantidad_aprobado": len(numeros_aprobado),
         "cantidad_revision": len(numeros_revision),
         "cantidad_rechazado": len(numeros_rechazado),
+
+        "total_b2b": len(numeros_b2b),
+        "total_b2c": len(numeros_b2c),
+
         "monto_total": monto_total,
         "monto_aprobado": monto_aprobado,
         "monto_revision": monto_revision,
         "monto_rechazado": monto_rechazado,
+
         "monto_preventivas": monto_preventivas,
         "monto_correctivas": monto_correctivas,
-        "aprobado_preventivas": len(numeros_aprobado_preventivas),
-        "aprobado_correctivas": len(numeros_aprobado_correctivas),
-        "revision_preventivas": len(numeros_revision_preventivas),
-        "revision_correctivas": len(numeros_revision_correctivas),
-        "rechazado_preventivas": len(numeros_rechazado_preventivas),
-        "rechazado_correctivas": len(numeros_rechazado_correctivas),
-        "total_b2b": len(numeros_b2b),
-        "total_b2c": len(numeros_b2c),
+
         "monto_b2b": monto_b2b,
         "monto_b2c": monto_b2c,
+
         "iva_19": iva_19,
         "monto_total_con_iva": monto_total_con_iva,
-        "cantidad_no_cobrado": len(numeros_no_cobrado),
-        "monto_no_cobrado": monto_no_cobrado,
-        "no_cobrado_preventivas": len(numeros_no_cobrado_preventivas),
-        "no_cobrado_correctivas": len(numeros_no_cobrado_correctivas),
+
+        "resumen_estados": resumen_estados,
     }
 
 
-def obtener_resumen_estado_qs(servicios):
-    return servicios.aggregate(
-        total_mantenciones=Count("numero", distinct=True),
-        monto_total=Coalesce(Sum("valor_pago_tecnico"), Value(0)),
-        monto_preventivas=Coalesce(
-            Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="PREVENTIV")),
-            Value(0)
-        ),
-        monto_correctivas=Coalesce(
-            Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="CORRECTIV")),
-            Value(0)
-        ),
-        monto_aprobado=Coalesce(
-            Sum("valor_pago_tecnico", filter=Q(estado_pago="aprobado")),
-            Value(0)
-        ),
-        monto_revision=Coalesce(
-            Sum("valor_pago_tecnico", filter=Q(estado_pago="revision")),
-            Value(0)
-        ),
-        monto_rechazado=Coalesce(
-            Sum("valor_pago_tecnico", filter=Q(estado_pago="rechazado")),
-            Value(0)
-        ),
-        cantidad_aprobado=Count("numero", distinct=True, filter=Q(estado_pago="aprobado")),
-        cantidad_revision=Count("numero", distinct=True, filter=Q(estado_pago="revision")),
-        cantidad_rechazado=Count("numero", distinct=True, filter=Q(estado_pago="rechazado")),
-        aprobado_preventivas=Count(
-            "numero",
-            distinct=True,
-            filter=Q(estado_pago="aprobado", tipo_servicio__icontains="PREVENTIV")
-        ),
-        aprobado_correctivas=Count(
-            "numero",
-            distinct=True,
-            filter=Q(estado_pago="aprobado", tipo_servicio__icontains="CORRECTIV")
-        ),
-        revision_preventivas=Count(
-            "numero",
-            distinct=True,
-            filter=Q(estado_pago="revision", tipo_servicio__icontains="PREVENTIV")
-        ),
-        revision_correctivas=Count(
-            "numero",
-            distinct=True,
-            filter=Q(estado_pago="revision", tipo_servicio__icontains="CORRECTIV")
-        ),
-        rechazado_preventivas=Count(
-            "numero",
-            distinct=True,
-            filter=Q(estado_pago="rechazado", tipo_servicio__icontains="PREVENTIV")
-        ),
-        rechazado_correctivas=Count(
-            "numero",
-            distinct=True,
-            filter=Q(estado_pago="rechazado", tipo_servicio__icontains="CORRECTIV")
-        ),
-        monto_no_cobrado=Coalesce(
-            Sum("valor_pago_tecnico", filter=Q(estado_pago="no_cobrado")),
-            Value(0)
-        ),
-        cantidad_no_cobrado=Count("numero", distinct=True, filter=Q(estado_pago="no_cobrado")),
-        no_cobrado_preventivas=Count(
-            "numero",
-            distinct=True,
-            filter=Q(estado_pago="no_cobrado", tipo_servicio__icontains="PREVENTIV")
-        ),
-        no_cobrado_correctivas=Count(
-            "numero",
-            distinct=True,
-            filter=Q(estado_pago="no_cobrado", tipo_servicio__icontains="CORRECTIV")
-        ),
-    )
+# =========================================================
+# VISTAS DE CARGA Y PROCESAMIENTO
+# =========================================================
 
-
-def obtener_ceco(servicio):
-    return CECO.objects.filter(
-        cuenta=servicio.cuenta_contable,
-        ceco=getattr(servicio, "ceco_codigo", None)
-    ).first()
-
-
-# ==============================
-# PÁGINAS BASE
-# ==============================
-
-def internos(request):
-    cargas = CargaMensual.objects.all().order_by("-fecha_carga")
-
-    tecnico_seleccionado = request.GET.get("tecnico")
-    carga_id = request.GET.get("carga")
-    mes = request.GET.get("mes")
-    anio = request.GET.get("anio")
-    tipo_servicio = request.GET.get("tipo_servicio")
-    anios_disponibles = (
-        CargaMensual.objects.exclude(anio__isnull=True)
-        .values_list("anio", flat=True)
-        .distinct()
-        .order_by("-anio")
-    )
-
-    meses_disponibles = (
-        CargaMensual.objects.exclude(mes__isnull=True)
-        .values_list("mes", flat=True)
-        .distinct()
-        .order_by("mes")
-    )
-
-    servicios = ServicioTecnico.objects.filter(
-        tecnico_obj__tipo="interno"
-    ).select_related("tecnico_obj", "contratista", "carga")
-
-    if mes and anio:
-        servicios = servicios.filter(carga__mes=mes, carga__anio=anio)
-    elif carga_id:
-        servicios = servicios.filter(carga_id=carga_id)
-
-    if tecnico_seleccionado:
-        servicios = servicios.filter(tecnico=tecnico_seleccionado)
-
-    if tipo_servicio:
-        servicios = servicios.filter(tipo_servicio__icontains=tipo_servicio)
-
-    servicios = servicios.order_by("fecha_finalizacion")
-
-    tecnicos = ServicioTecnico.objects.filter(
-        Q(tecnico_obj__tipo="interno") |
-        Q(tecnico_obj__isnull=True, contratista__isnull=True)
-    ).exclude(
-        tecnico__isnull=True
-    ).exclude(
-        tecnico=""
-    ).values_list(
-        "tecnico", flat=True
-    ).distinct().order_by("tecnico")
-
-    resumen = servicios.aggregate(
-        total=Count("numero", distinct=True),
-
-        preventivos=Count("numero", distinct=True, filter=Q(tipo_servicio__icontains="PREVENTIV")),
-        correctivos=Count("numero", distinct=True, filter=Q(tipo_servicio__icontains="CORRECTIV")),
-
-        total_b2b=Count("numero", distinct=True, filter=Q(es_b2b=True)),
-        total_b2c=Count("numero", distinct=True, filter=Q(es_b2b=False)),
-
-        costo_preventivas=Coalesce(
-            Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="PREVENTIV")),
-            Value(0)
-        ),
-        costo_correctivas=Coalesce(
-            Sum("valor_pago_tecnico", filter=Q(tipo_servicio__icontains="CORRECTIV")),
-            Value(0)
-        ),
-
-        costo_b2b=Coalesce(
-            Sum("valor_pago_tecnico", filter=Q(es_b2b=True)),
-            Value(0)
-        ),
-        costo_b2c=Coalesce(
-            Sum("valor_pago_tecnico", filter=Q(es_b2b=False)),
-            Value(0)
-        ),
-
-        costo_total=Coalesce(Sum("valor_pago_tecnico"), Value(0))
-    )
-
-    resumen_tecnicos = servicios.values("tecnico").annotate(
-        total=Count("numero", distinct=True),
-
-        b2b=Count("numero", distinct=True, filter=Q(es_b2b=True)),
-        b2c=Count("numero", distinct=True, filter=Q(es_b2b=False)),
-
-        costo_b2b=Coalesce(
-            Sum("valor_pago_tecnico", filter=Q(es_b2b=True)),
-            Value(0)
-        ),
-        costo_b2c=Coalesce(
-            Sum("valor_pago_tecnico", filter=Q(es_b2b=False)),
-            Value(0)
-        ),
-
-        costo_total=Coalesce(Sum("valor_pago_tecnico"), Value(0))
-    ).exclude(
-        tecnico__isnull=True
-    ).exclude(
-        tecnico=""
-    ).order_by("-costo_total")
-
-    servicios_principales = [
-        "ServicioViña",
-        "ServicioStgo",
-        "Leonardo Flores",
-    ]
-
-    tabla_servicios = []
-    tabla_tecnicos = []
-
-    for tecnico in resumen_tecnicos:
-        if tecnico["tecnico"] in servicios_principales:
-            tabla_servicios.append(tecnico)
-        else:
-            tabla_tecnicos.append(tecnico)
-
-    return render(request, "servicios/internos.html", {
-        "tecnicos": tecnicos,
-        "cargas": cargas,
-        "servicios": servicios,
-        "resumen": resumen,
-        "resumen_tecnicos": resumen_tecnicos,
-        "tabla_servicios": tabla_servicios,
-        "tabla_tecnicos": tabla_tecnicos,
-        "tecnico_seleccionado": tecnico_seleccionado,
-        "carga_id": carga_id,
-        "tipo_servicio": tipo_servicio,
-        "mes": mes,
-        "anio": anio,
-        "anios_disponibles": anios_disponibles,
-        "meses_disponibles": meses_disponibles,
-    })
-
-
-# ==============================
-# SUBIR ARCHIVO
-# ==============================
-
+@require_http_methods(["GET", "POST"])
 def subir_excel(request):
-    mensaje = ""
-
-    ALIAS_TECNICOS = {
-        "ROBERTO BARRERA N": "ROBERTO BARRERA N",
-        "ROMER PEREZ": "ROMER PEREZ",
-        "MARCELO COLQUE ULLOA": "MARCELO COLQUE ULLOA",
-        "NEGTEL INGENIERIA": "NEGTEL INGENIERIA SPA",
-        "NEGTEL INGENIERIA SPA": "NEGTEL INGENIERIA SPA",
-        "NELSON VERA EIRL": "NELSON VERA EIRL",
-        "JR SYSTEM SECURITY": "JR SYSTEM SECURITY",
-        "DEFCON": "DEFCON",
-        "SERVICIOSTGO": "SERVICIOSTGO",
-        "SERVICIOVINA": "SERVICIOVINA",
-    }
-
-    CONTRATISTAS_MANUALES = {
-        "PABLO ALVARADO",
-    }
+    mensaje = None
 
     if request.method == "POST":
         nombre_carga = request.POST.get("nombre_carga")
         mes = request.POST.get("mes")
         anio = request.POST.get("anio")
+
         archivo1 = request.FILES.get("archivo1")
         archivo2 = request.FILES.get("archivo2")
 
-        if nombre_carga and archivo1 and archivo2:
-            try:
-                # Primero validar lectura antes de borrar datos anteriores
-                dataframes = []
+        if not all([nombre_carga, mes, anio, archivo1, archivo2]):
+            messages.error(request, "Debes completar todos los campos.")
+            return redirect("subir_excel")
+
+        try:
+            with transaction.atomic():
+                carga_mensual = CargaMensual.objects.create(
+                    nombre=nombre_carga,
+                    mes=int(mes),
+                    anio=int(anio),
+                    activa=True,
+                )
 
                 for archivo in [archivo1, archivo2]:
+                    contenido = archivo.read()
                     archivo.seek(0)
-                    tablas = pd.read_html(archivo)
-                    if tablas:
-                        dataframes.append(tablas[0])
 
-                if not dataframes:
-                    raise ValueError("No se encontraron tablas válidas en los archivos.")
+                    hash_archivo = ArchivoCarga.calcular_hash_desde_bytes(contenido)
 
-                df = pd.concat(dataframes, ignore_index=True)
-                df.columns = df.columns.astype(str).str.strip()
+                    if ArchivoCarga.objects.filter(hash_archivo=hash_archivo).exists():
+                        messages.warning(request, f"El archivo {archivo.name} ya fue cargado antes y se omitió.")
+                        continue
 
-                with transaction.atomic():
-                    # Reemplazar solo cuando ya está validado el DataFrame
-                    CargaMensual.objects.filter(nombre=nombre_carga).delete()
+                    df = leer_archivo_excel_generico(archivo)
 
-                    carga = CargaMensual.objects.create(
-                        nombre=nombre_carga,
-                        mes=int(mes) if mes else None,
-                        anio=int(anio) if anio else None,
+                    archivo_carga = ArchivoCarga.objects.create(
+                        carga_mensual=carga_mensual,
+                        nombre_original=archivo.name,
+                        hash_archivo=hash_archivo,
+                        mes=int(mes),
+                        anio=int(anio),
+                        estado="cargado",
                     )
 
-                    # limpiar monto pago técnico
-                    if "Valor pago técnico" in df.columns:
-                        df["Valor pago técnico"] = (
-                            df["Valor pago técnico"]
-                            .astype(str)
-                            .str.replace(r"\.(?=\d{3})", "", regex=True)
-                            .str.replace(",", "", regex=False)
-                            .str.strip()
-                        )
-                        df["Valor pago técnico"] = pd.to_numeric(
-                            df["Valor pago técnico"],
-                            errors="coerce"
-                        ).fillna(0)
-
-                    # limpiar valor general
-                    if "Valor" in df.columns:
-                        df["Valor"] = (
-                            df["Valor"]
-                            .astype(str)
-                            .str.replace(r"\.(?=\d{3})", "", regex=True)
-                            .str.replace(",", "", regex=False)
-                            .str.strip()
-                        )
-                        df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce")
-
-                    # limpiar costo mano de obra
-                    if "Costo mano de obra" in df.columns:
-                        df["Costo mano de obra"] = (
-                            df["Costo mano de obra"]
-                            .astype(str)
-                            .str.replace(r"\.(?=\d{3})", "", regex=True)
-                            .str.replace(",", "", regex=False)
-                            .str.strip()
-                        )
-                        df["Costo mano de obra"] = pd.to_numeric(
-                            df["Costo mano de obra"],
-                            errors="coerce"
-                        )
-
-                    # cuenta contable desde cuenta original
-                    if "Cuenta" in df.columns:
-                        df["cuenta_contable"] = df["Cuenta"].apply(extraer_cuenta_contable)
-                    else:
-                        df["cuenta_contable"] = ""
-
-                    # fecha visita
-                    if "Fecha de la visita" in df.columns:
-                        df["fecha_visita_convertida"] = pd.to_datetime(
-                            df["Fecha de la visita"],
-                            errors="coerce",
-                            dayfirst=True
-                        )
-                    else:
-                        df["fecha_visita_convertida"] = pd.NaT
-
-                    df["fecha_visita_solo_dia"] = df["fecha_visita_convertida"].dt.date
-
-                    # incidencias por día
-                    df["numero_incidencias_dia"] = (
-                        df.groupby(
-                            ["cuenta_contable", "fecha_visita_solo_dia"],
-                            dropna=False
-                        )["cuenta_contable"]
-                        .transform("count")
-                        .fillna(0)
-                        .astype(int)
-                    )
-                    # fecha finalización convertida
-                    if "Fecha de finalizacion" in df.columns:
-                        df["fecha_finalizacion_convertida"] = pd.to_datetime(
-                            df["Fecha de finalizacion"],
-                            errors="coerce",
-                            dayfirst=True
-                        )
-                    else:
-                        df["fecha_finalizacion_convertida"] = pd.NaT
-
-                    # incidencias en los 60 días anteriores por cuenta_contable
-                    # fecha finalización convertida
-                    if "Fecha de finalizacion" in df.columns:
-                        df["fecha_finalizacion_convertida"] = pd.to_datetime(
-                            df["Fecha de finalizacion"],
-                            errors="coerce",
-                            dayfirst=True
-                        )
-                    else:
-                        df["fecha_finalizacion_convertida"] = pd.NaT
-
-                    # usar solo la fecha, sin hora
-                    df["fecha_finalizacion_solo_dia"] = df["fecha_finalizacion_convertida"].dt.date
-
-                    # normalizar técnico para separar el conteo por el mismo contratista/técnico
-                    df["tecnico_normalizado"] = df["Tecnico"].apply(
-                        lambda x: normalizar_nombre(limpiar_nombre_tecnico(x))
-                    )
-
-                    # incidencias en los últimos 60 días por cuenta_contable + mismo técnico/contratista
-                    df["numero_incidencias_60_dias"] = 0
-
-                    for (cuenta, tecnico), grupo in df.groupby(
-                        ["cuenta_contable", "tecnico_normalizado"],
-                        dropna=False
-                    ):
-                        grupo = grupo.sort_values("fecha_finalizacion_solo_dia").copy()
-
-                        fechas = grupo["fecha_finalizacion_solo_dia"]
-                        indices = grupo.index.tolist()
-                        resultados = []
-
-                        for fecha_actual in fechas:
-                            if pd.isna(fecha_actual):
-                                resultados.append(0)
-                                continue
-
-                            fecha_inicio = fecha_actual - pd.Timedelta(days=60)
-
-                            cantidad = (
-                                (fechas >= fecha_inicio) &
-                                (fechas <= fecha_actual)
-                            ).sum()
-
-                            resultados.append(int(cantidad))
-
-                        df.loc[indices, "numero_incidencias_60_dias"] = resultados
-
-                    # diccionario de contratistas
-                    contratistas_db = {}
-                    for c in Contratista.objects.all():
-                        if c.nombre:
-                            contratistas_db[normalizar_nombre(c.nombre)] = c
-                        if c.nombre_empresa:
-                            contratistas_db[normalizar_nombre(c.nombre_empresa)] = c
-
-                    # diccionario de técnicos
-                    tecnicos_db = {}
-                    for t in Tecnico.objects.select_related("contratista").all():
-                        if t.nombre:
-                            tecnicos_db[normalizar_nombre(t.nombre)] = t
-
-                    # set de cuentas b2b normalizadas
-                    cuentas_b2b_set = {
-                        normalizar_cuenta(c)
-                        for c in CuentaB2B.objects.values_list("cuenta", flat=True)
-                        if c
-                    }
-
-                    servicios_a_crear = []
-
-                    for _, row in df.iterrows():
-                        nombre_original = row.get("Tecnico")
-                        nombre_limpio = limpiar_nombre_tecnico(nombre_original)
-                        nombre_normalizado = normalizar_nombre(nombre_limpio)
-
-                        if nombre_normalizado in ALIAS_TECNICOS:
-                            nombre_normalizado = ALIAS_TECNICOS[nombre_normalizado]
-
-                        tecnico_obj = None
-                        contratista_obj = None
-
-                        if nombre_normalizado:
-                            tecnico_obj = tecnicos_db.get(nombre_normalizado)
-
-                            if not tecnico_obj and nombre_limpio:
-                                tecnico_obj = Tecnico.objects.filter(nombre=nombre_limpio).first()
-                                if tecnico_obj:
-                                    tecnicos_db[nombre_normalizado] = tecnico_obj
-
-                            if not tecnico_obj and nombre_limpio:
-                                texto_original = str(nombre_original or "").upper().strip()
-                                es_contratista = False
-
-                                if texto_original.startswith("T. EXTERNO") or texto_original.startswith("T EXTERNO"):
-                                    es_contratista = True
-
-                                if nombre_normalizado in contratistas_db:
-                                    es_contratista = True
-
-                                if nombre_normalizado in CONTRATISTAS_MANUALES:
-                                    es_contratista = True
-
-                                contratista_obj = contratistas_db.get(nombre_normalizado) if es_contratista else None
-
-                                tecnico_obj, creado = Tecnico.objects.get_or_create(
-                                    nombre=nombre_limpio,
-                                    defaults={
-                                        "tipo": "contratista" if es_contratista else "interno",
-                                        "categoria": "principal" if es_contratista else "remoto",
-                                        "contratista": contratista_obj,
-                                    }
-                                )
-
-                                if not creado:
-                                    cambios = []
-
-                                    if es_contratista and tecnico_obj.tipo != "contratista":
-                                        tecnico_obj.tipo = "contratista"
-                                        cambios.append("tipo")
-
-                                    if es_contratista and contratista_obj and tecnico_obj.contratista_id != contratista_obj.id:
-                                        tecnico_obj.contratista = contratista_obj
-                                        cambios.append("contratista")
-
-                                    if cambios:
-                                        tecnico_obj.save(update_fields=cambios)
-
-                                tecnicos_db[nombre_normalizado] = tecnico_obj
-
-                            if tecnico_obj and tecnico_obj.tipo == "contratista":
-                                contratista_obj = tecnico_obj.contratista
-
-                                if not contratista_obj:
-                                    contratista_obj = contratistas_db.get(nombre_normalizado)
-                                    if contratista_obj:
-                                        tecnico_obj.contratista = contratista_obj
-                                        tecnico_obj.save(update_fields=["contratista"])
-
-                        valor_pago = row.get("Valor pago técnico")
-                        valor_general = row.get("Valor")
-                        costo_mano_obra = row.get("Costo mano de obra")
-
-                        es_b2b, cuenta_contable = clasificar_b2b(row.get("Cuenta"), cuentas_b2b_set)
-
-                        servicios_a_crear.append(
-                            ServicioTecnico(
-                                carga=carga,
-                                numero=row.get("Número"),
-                                fecha_creacion=convertir_fecha(row.get("Fecha de Creación")),
-                                fecha_modificacion=convertir_fecha(row.get("Fecha de modificación")),
-                                fecha_visita=limpiar_fecha(row.get("fecha_visita_convertida")),
-                                fecha_finalizacion=convertir_fecha(row.get("Fecha de finalizacion")),
-                                cuenta=truncar_texto(row.get("Cuenta"), 400),
-                                cuenta_contable=cuenta_contable,
-                                es_b2b=es_b2b,
-                                telefono=truncar_texto(row.get("Teléfono"), 100),
-                                tecnico=nombre_limpio,
-                                tecnico_obj=tecnico_obj,
-                                contratista=contratista_obj,
-                                direccion=truncar_texto(row.get("Dirección"), 300),
-                                provincia_estado=row.get("Provincia-Estado"),
-                                localidad=row.get("Localidad"),
-                                tipo_servicio=row.get("Tipo de Servicio"),
-                                servicio=truncar_texto(row.get("Servicio"), 300),
-                                observaciones=row.get("Observaciones (Insumos)"),
-                                estado=row.get("Estado"),
-                                usuario=row.get("Usuario"),
-                                valor=valor_general if pd.notna(valor_general) else None,
-                                costo_mano_obra=costo_mano_obra if pd.notna(costo_mano_obra) else None,
-                                fecha_pago=convertir_fecha(row.get("Fecha de pago")),
-                                valor_pago_original=valor_pago if pd.notna(valor_pago) else 0,
-                                valor_pago_tecnico=valor_pago if pd.notna(valor_pago) else 0,
-                                tiempo_trabajo_total=row.get("Tiempo de Trabajo Total"),
-                                numero_incidencias_dia=int(row.get("numero_incidencias_dia") or 0),
-                                numero_incidencias_60_dias=int(row.get("numero_incidencias_60_dias") or 0),
-                            )
-                        )
-
-                    ServicioTecnico.objects.bulk_create(servicios_a_crear, batch_size=1000)
-
-                mensaje = "Carga procesada correctamente"
-
-            except Exception as e:
-                logger.exception("Error al procesar archivos Excel")
-                mensaje = f"Error al procesar la carga: {str(e)}"
-
-    return render(request, "servicios/subir_excel.html", {
-        "mensaje": mensaje
-    })
-
-
-# ==============================
-# BUSCADOR
-# ==============================
-
-def buscador_servicios(request):
-    query = request.GET.get("q")
-    carga_id = request.GET.get("carga")
-    mes = request.GET.get("mes")
-    anio = request.GET.get("anio")
-    contratista_id = request.GET.get("contratista_id")
-    tipo_servicio = request.GET.get("tipo_servicio")
-    provincia_estado_sel = request.GET.get("provincia_estado")
-    tecnico_sel = request.GET.get("tecnico")
-
-    if mes and anio:
-        servicios = servicios.filter(carga__mes=mes, carga__anio=anio)
-    elif carga_id:
-        servicios = servicios.filter(carga_id=carga_id)
-
-    servicios = ServicioTecnico.objects.all().select_related(
-        "contratista", "tecnico_obj", "carga"
-    ).order_by("-fecha_finalizacion")
-
-    if mes and anio:
-        servicios = servicios.filter(carga__mes=mes, carga__anio=anio)
-    elif carga_id:
-        servicios = servicios.filter(carga_id=carga_id)
-
-    if contratista_id:
-        servicios = servicios.filter(contratista_id=contratista_id)
-
-    if tipo_servicio:
-        servicios = servicios.filter(tipo_servicio__icontains=tipo_servicio)
-
-    if tecnico_sel:
-        servicios = servicios.filter(tecnico=tecnico_sel)
-
-    if provincia_estado_sel:
-        valor = provincia_estado_sel.strip().upper()
-        servicios_filtrados = []
-
-        for s in servicios:
-            dato = str(s.provincia_estado).strip().upper() if s.provincia_estado else ""
-
-            if valor == "NAN":
-                if dato == "NAN" or dato == "":
-                    servicios_filtrados.append(s)
-            else:
-                if dato == valor:
-                    servicios_filtrados.append(s)
-
-        servicios_ids = [s.id for s in servicios_filtrados]
-        servicios = servicios.filter(id__in=servicios_ids)
-
-    if query:
-        servicios = servicios.filter(
-            Q(numero__icontains=query) |
-            Q(cuenta_contable__icontains=query) |
-            Q(cuenta__icontains=query) |
-            Q(tecnico__icontains=query) |
-            Q(tecnico_obj__nombre__icontains=query) |
-            Q(contratista__nombre__icontains=query)
-        )
-
-    cargas = CargaMensual.objects.all().order_by("-fecha_carga")
-
-    anios_disponibles = (
-        CargaMensual.objects.exclude(anio__isnull=True)
-        .values_list("anio", flat=True)
-        .distinct()
-        .order_by("-anio")
-    )
-
-    meses_disponibles = (
-        CargaMensual.objects.exclude(mes__isnull=True)
-        .values_list("mes", flat=True)
-        .distinct()
-        .order_by("mes")
-    )
-
-    contratistas = Contratista.objects.all().order_by("nombre")
-
-    tecnicos = ServicioTecnico.objects.exclude(
-        tecnico__isnull=True
-    ).exclude(
-        tecnico=""
-    ).values_list(
-        "tecnico", flat=True
-    ).distinct().order_by("tecnico")
-
-    provincias_qs = ServicioTecnico.objects.values_list("provincia_estado", flat=True)
-    provincias_set = set()
-
-    for p in provincias_qs:
-        dato = str(p).strip().upper() if p else "NAN"
-        if not dato:
-            dato = "NAN"
-        provincias_set.add(dato)
-
-    provincias = sorted(provincias_set)
-
-    return render(request, "servicios/buscador.html", {
-        "servicios": servicios,
-        "query": query,
-        "cargas": cargas,
-        "carga_seleccionada": carga_id,
-        "mes": mes,
-        "anio": anio,
-        "contratista_id": contratista_id,
-        "tipo_servicio": tipo_servicio,
-        "provincia_estado_sel": provincia_estado_sel,
-        "tecnico_sel": tecnico_sel,
-        "anios_disponibles": anios_disponibles,
-        "meses_disponibles": meses_disponibles,
-        "contratistas": contratistas,
-        "provincia": provincias,
-        "tecnicos": tecnicos,
-    })
-
-
-# ==============================
-# CONTRATISTAS
-# ==============================
-
-def contratista(request):
-    cargas = CargaMensual.objects.all().order_by("-fecha_carga")
-
-    mes = request.GET.get("mes")
-    anio = request.GET.get("anio")
-    carga_id = request.GET.get("carga")
-    contratista_id = request.GET.get("contratista_id")
-    estado_pago = request.GET.get("estado_pago")
-    tipo_servicio = request.GET.get("tipo_servicio")
-    provincia_estado_sel = request.GET.get("provincia_estado")
-    anios_disponibles = (
-        CargaMensual.objects.exclude(anio__isnull=True)
-        .values_list("anio", flat=True)
-        .distinct()
-        .order_by("-anio")
-    )
-
-    meses_disponibles = (
-        CargaMensual.objects.exclude(mes__isnull=True)
-        .values_list("mes", flat=True)
-        .distinct()
-        .order_by("mes")
-    )
-
-    contratistas = Contratista.objects.all().order_by("nombre")
-
-    contratista_obj = None
-    if contratista_id:
-        contratista_obj = Contratista.objects.filter(id=contratista_id).first()
-
-    servicios_qs = ServicioTecnico.objects.filter(
-        Q(tecnico_obj__tipo="contratista") |
-        Q(tecnico_obj__isnull=True, contratista__isnull=False)
-    ).select_related("contratista", "tecnico_obj", "carga")
-
-    if mes and anio:
-        servicios_qs = servicios_qs.filter(carga__mes=mes, carga__anio=anio)
-    elif carga_id:
-        servicios_qs = servicios_qs.filter(carga_id=carga_id)
-
-    if contratista_id:
-        servicios_qs = servicios_qs.filter(contratista_id=contratista_id)
-
-    if estado_pago:
-        servicios_qs = servicios_qs.filter(estado_pago=estado_pago)
-
-    if tipo_servicio:
-        servicios_qs = servicios_qs.filter(tipo_servicio__icontains=tipo_servicio)
-
-    servicios_qs = servicios_qs.order_by("fecha_finalizacion")
-    servicios = list(servicios_qs)
-
-    if provincia_estado_sel:
-        valor = provincia_estado_sel.strip().upper()
-        servicios_filtrados = []
-
-        for s in servicios:
-            dato = str(s.provincia_estado).strip().upper() if s.provincia_estado else ""
-
-            if valor == "NAN":
-                if dato == "NAN" or dato == "":
-                    servicios_filtrados.append(s)
-            else:
-                if dato == valor:
-                    servicios_filtrados.append(s)
-
-        servicios = servicios_filtrados
-
-    provincias_set = set()
-
-    for s in servicios_qs:
-        dato = str(s.provincia_estado).strip().upper() if s.provincia_estado else "NAN"
-        if not dato:
-            dato = "NAN"
-        provincias_set.add(dato)
-
-    provincias = sorted(provincias_set)
-
-    def normalizar(valor):
-        if not valor:
-            return ""
-        return str(valor).strip().upper()
-
-    ceco_dict = {
-        normalizar(c.cuenta): c.ceco
-        for c in CECO.objects.all()
-    }
-
-    for s in servicios:
-        cuenta = normalizar(s.cuenta_contable)
-        s.ceco = ceco_dict.get(cuenta, "-")
-
-    resumen = obtener_resumen_contratista(servicios)
-
-    return render(request, "servicios/contratista.html", {
-        "cargas": cargas,
-        "contratistas": contratistas,
-        "servicios": servicios,
-        "contratista": contratista_obj,
-        "resumen": resumen,
-        "mes": mes,
-        "anio": anio,
-        "carga_id": carga_id,
-        "contratista_id": contratista_id,
-        "estado_pago": estado_pago,
-        "tipo_servicio": tipo_servicio,
-        "provincia_estado_sel": provincia_estado_sel,
-        "provincia": provincias,
-        "anios_disponibles": anios_disponibles,
-        "meses_disponibles": meses_disponibles,
-    })
-
-
-# ==============================
-# CAMBIAR ESTADO PAGO
-# ==============================
-
-def cambiar_estado_pago(request, servicio_id):
-    servicio = get_object_or_404(ServicioTecnico, id=servicio_id)
-
-    if request.method == "POST":
-        servicio.estado_pago = request.POST.get("estado_pago")
-        servicio.save(update_fields=["estado_pago"])
-        return JsonResponse({"success": True})
-
-    return JsonResponse({"success": False, "error": "Método no permitido"})
-
-
-# ==============================
-# ACTUALIZAR MONTO
-# ==============================
-
-def actualizar_monto(request, servicio_id):
-    if request.method == "POST":
-        servicio = get_object_or_404(ServicioTecnico, id=servicio_id)
-        nuevo_valor = request.POST.get("valor")
-
-        try:
-            valor_limpio = str(nuevo_valor).replace(".", "").replace(",", "").strip()
-            servicio.valor_pago_tecnico = int(Decimal(valor_limpio))
-            servicio.save()
-            return JsonResponse({"success": True})
-        except (InvalidOperation, TypeError, ValueError):
-            return JsonResponse({"success": False})
-
-    return JsonResponse({"success": False})
-
-
-# ==============================
-# ELIMINAR CARGA COMPLETA
-# ==============================
-
-def eliminar_carga(request, carga_id):
-    carga = get_object_or_404(CargaMensual, id=carga_id)
-    carga.delete()
-    return redirect("inicio")
-
-
-# ==============================
-# EDITAR MONTO TÉCNICO
-# ==============================
-
-@csrf_exempt
-def editar_monto_tecnico(request, servicio_id):
-    if request.method == "POST":
-        try:
-            data = json.loads(request.body)
-
-            valor_raw = str(data.get("valor_pago_tecnico", "0")).replace(".", "").replace(",", "").strip()
-            nuevo_valor = int(Decimal(valor_raw or 0))
-
-            servicio = ServicioTecnico.objects.get(id=servicio_id)
-
-            if servicio.valor_pago_original is None:
-                servicio.valor_pago_original = servicio.valor_pago_tecnico
-
-            servicio.valor_pago_tecnico = nuevo_valor
-            servicio.save(update_fields=["valor_pago_tecnico", "valor_pago_original"])
-
-            return JsonResponse({"success": True})
+                    guardar_dataframe_en_raw(df, archivo_carga)
+                    procesar_archivo_carga(archivo_carga)
+
+                messages.success(request, "Archivos cargados y procesados correctamente.")
+                return redirect("subir_excel")
 
         except Exception as e:
-            return JsonResponse({
-                "success": False,
-                "error": str(e)
-            })
+            logger.exception("Error al subir archivos")
+            mensaje = f"Error al procesar archivos: {str(e)}"
+            messages.error(request, mensaje)
 
-    return JsonResponse({
-        "success": False,
-        "error": "Método no permitido"
-    })
+    return render(request, "servicios/subir_excel.html", {"mensaje": mensaje})
 
 
-# ==============================
-# PDF CONTRATISTA
-# ==============================
+def cargas_archivos(request):
+    archivos = ArchivoCarga.objects.select_related("carga_mensual").order_by("-fecha_creacion")
+    return render(request, "servicios/cargas_archivos.html", {"archivos": archivos})
 
-def contratista_pdf(request):
-    
-    mes = request.GET.get("mes") or ""
-    anio = request.GET.get("anio") or ""
-    carga_id = request.GET.get("carga") or ""
-    contratista_id = request.GET.get("contratista_id") or ""
-    estado_pago = request.GET.get("estado_pago") or ""
-    tipo_servicio = request.GET.get("tipo_servicio") or ""
-    provincia_estado_sel = request.GET.get("provincia_estado") or ""
-    columnas = request.GET.getlist("columnas")
 
-    if not columnas:
-        columnas = [
-            "numero",
-            "fecha_finalizacion",
-            "cuenta",
-            "cuenta_contable",
-            "ceco",
-            "provincia_estado",
-            "tipo_servicio",
-            "servicio",
-            "tecnico",
-            "observaciones",
-            "valor_pago_tecnico",
-        ]
+def observaciones_importacion(request):
+    observaciones = ObservacionImportacion.objects.select_related(
+        "raw",
+        "raw__archivo_carga",
+        "raw__archivo_carga__carga_mensual"
+    ).order_by("estado", "-fecha_creacion")
 
-    contratista_obj = None
-    if contratista_id:
-        contratista_obj = Contratista.objects.filter(id=contratista_id).first()
+    estado = request.GET.get("estado")
+    archivo_id = request.GET.get("archivo_id")
+    detalle = request.GET.get("detalle")
 
-    servicios_qs = ServicioTecnico.objects.filter(
-        Q(tecnico_obj__tipo="contratista") |
-        Q(tecnico_obj__isnull=True, contratista__isnull=False)
-    ).select_related("contratista", "tecnico_obj", "carga")
+    if estado:
+        observaciones = observaciones.filter(estado=estado)
 
-    if mes and anio:
-        servicios_qs = servicios_qs.filter(carga__mes=mes, carga__anio=anio)
-    elif carga_id:
-        servicios_qs = servicios_qs.filter(carga_id=carga_id)
+    if archivo_id:
+        observaciones = observaciones.filter(raw__archivo_carga_id=archivo_id)
 
-    if contratista_id:
-        servicios_qs = servicios_qs.filter(contratista_id=contratista_id)
+    if detalle:
+        observaciones = observaciones.filter(detalle=detalle)
 
-    if estado_pago:
-        servicios_qs = servicios_qs.filter(estado_pago=estado_pago)
+    detalles_disponibles = (
+        ObservacionImportacion.objects
+        .exclude(detalle__isnull=True)
+        .exclude(detalle="")
+        .values_list("detalle", flat=True)
+        .distinct()
+        .order_by("detalle")
+    )
 
-    if tipo_servicio:
-        servicios_qs = servicios_qs.filter(tipo_servicio__icontains=tipo_servicio)
-
-    servicios_qs = servicios_qs.order_by("fecha_finalizacion")
-    servicios = list(servicios_qs)
-
-    if provincia_estado_sel:
-        valor = provincia_estado_sel.strip().upper()
-        servicios_filtrados = []
-
-        for s in servicios:
-            dato = str(s.provincia_estado).strip().upper() if s.provincia_estado else ""
-
-            if valor == "NAN":
-                if dato == "NAN" or dato == "":
-                    servicios_filtrados.append(s)
-            else:
-                if dato == valor:
-                    servicios_filtrados.append(s)
-
-        servicios = servicios_filtrados
-
-    def normalizar(valor):
-        if not valor:
-            return ""
-        return str(valor).strip().upper()
-
-    ceco_dict = {
-        normalizar(c.cuenta): c.ceco
-        for c in CECO.objects.all()
-    }
-
-    for s in servicios:
-        cuenta = normalizar(s.cuenta_contable)
-        s.ceco = ceco_dict.get(cuenta, "-")
-
-        if s.tecnico_obj and s.tecnico_obj.nombre:
-            s.tecnico_pdf = s.tecnico_obj.nombre
-        elif s.tecnico:
-            s.tecnico_pdf = s.tecnico
-        else:
-            s.tecnico_pdf = "-"
-
-    resumen = obtener_resumen_contratista(servicios)
-    cantidad_columnas = len(columnas)
-
-    MESES_NOMBRES = {
-        "1": "Enero",
-        "2": "Febrero",
-        "3": "Marzo",
-        "4": "Abril",
-        "5": "Mayo",
-        "6": "Junio",
-        "7": "Julio",
-        "8": "Agosto",
-        "9": "Septiembre",
-        "10": "Octubre",
-        "11": "Noviembre",
-        "12": "Diciembre",
-    }
-
-    ESTADOS_PAGO_NOMBRES = {
-        "aprobado": "Aprobado",
-        "revision": "Revisión",
-        "rechazado": "Rechazado",
-        "no_cobrado": "No cobrado",
-    }
-
-    TIPOS_SERVICIO_NOMBRES = {
-        "PREVENTIV": "Preventivas",
-        "CORRECTIV": "Correctivas",
-    }
-
-    mes_mostrar = MESES_NOMBRES.get(str(mes), "Todos") if mes else "Todos"
-    anio_mostrar = anio if anio else "Todos"
-    estado_pago_mostrar = ESTADOS_PAGO_NOMBRES.get(estado_pago, "Todos") if estado_pago else "Todos"
-    tipo_servicio_mostrar = TIPOS_SERVICIO_NOMBRES.get(tipo_servicio, "Todos") if tipo_servicio else "Todos"
-    provincia_estado_mostrar = provincia_estado_sel if provincia_estado_sel else "Todos"
-
-    html_string = render_to_string(
-        "servicios/contratista_pdf.html",
+    return render(
+        request,
+        "servicios/observaciones_importacion.html",
         {
-            "contratista": contratista_obj,
-            "servicios": servicios,
-            "resumen": resumen,
-            "estado_pago": estado_pago,
-            "mes": mes,
-            "anio": anio,
-            "tipo_servicio": tipo_servicio,
-            "provincia_estado": provincia_estado_sel,
-            "contratista_id": contratista_id,
-            "columnas": columnas,
-            "cantidad_columnas": cantidad_columnas,
-            "mes_mostrar": mes_mostrar,
-            "anio_mostrar": anio_mostrar,
-            "estado_pago_mostrar": estado_pago_mostrar,
-            "tipo_servicio_mostrar": tipo_servicio_mostrar,
-            "provincia_estado_mostrar": provincia_estado_mostrar,
+            "observaciones": observaciones,
+            "archivo_id": archivo_id,
+            "estado_sel": estado,
+            "detalle_sel": detalle,
+            "detalles_disponibles": detalles_disponibles,
         }
     )
 
-    buffer = BytesIO()
-    pisa_status = pisa.CreatePDF(html_string, dest=buffer)
-    buffer.seek(0)
 
-    if pisa_status.err:
-        return HttpResponse("Error al generar PDF", status=500)
+# =========================================================
+# VISTA CONTRATISTAS
+# =========================================================
 
-    response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
-    response["Content-Disposition"] = 'inline; filename="reporte_contratista.pdf"'
-    return response
+def contratista(request):
+    servicios = ServicioTecnico.objects.select_related(
+        "contratista", "tecnico_obj", "ceco", "archivo_carga"
+    ).exclude(
+        tecnico__isnull=True
+    ).exclude(
+        tecnico=""
+    ).exclude(
+        tecnico="Sin técnico"
+    ).filter(
+        tecnico_obj__tipo="contratista"
+    )
+
+    mes = request.GET.get("mes")
+    anio = request.GET.get("anio")
+    contratista_id = request.GET.get("contratista_id")
+    tipo_servicio = request.GET.get("tipo_servicio")
+    provincia_estado = request.GET.get("provincia_estado")
+    estado_pago = request.GET.get("estado_pago")
+
+    if mes:
+        servicios = servicios.filter(carga__mes=mes)
+    if anio:
+        servicios = servicios.filter(carga__anio=anio)
+    if contratista_id:
+        servicios = servicios.filter(contratista_id=contratista_id)
+    if tipo_servicio:
+        servicios = servicios.filter(tipo_servicio__icontains=tipo_servicio)
+    if provincia_estado:
+        servicios = servicios.filter(provincia_estado=provincia_estado)
+    if estado_pago:
+        servicios = servicios.filter(estado_pago=estado_pago)
+
+    contratistas = Contratista.objects.filter(activo=True).order_by("nombre")
+    meses_disponibles = CargaMensual.objects.order_by("mes").values_list("mes", flat=True).distinct()
+    anios_disponibles = CargaMensual.objects.order_by("anio").values_list("anio", flat=True).distinct()
+    provincias = ServicioTecnico.objects.exclude(
+        provincia_estado__isnull=True
+    ).exclude(
+        provincia_estado=""
+    ).values_list("provincia_estado", flat=True).distinct().order_by("provincia_estado")
+
+    contratista_obj = None
+    if contratista_id:
+        contratista_obj = Contratista.objects.filter(id=contratista_id).first()
+
+    resumen = obtener_resumen_contratista(servicios)
+
+    contexto = {
+        "servicios": servicios.order_by("-fecha_finalizacion")[:500],
+        "resumen": resumen,
+        "contratistas": contratistas,
+        "contratista": contratista_obj,
+        "meses_disponibles": meses_disponibles,
+        "anios_disponibles": anios_disponibles,
+        "provincia": provincias,
+        "mes": mes,
+        "anio": anio,
+        "contratista_id": contratista_id,
+        "tipo_servicio": tipo_servicio,
+        "provincia_estado_sel": provincia_estado,
+        "estado_pago": estado_pago,
+    }
+    return render(request, "servicios/contratista.html", contexto)
 
 
-# ==============================
-# EXPORTAR EXCEL
-# ==============================
+# =========================================================
+# VISTA INTERNOS
+# =========================================================
+
+def internos(request):
+    servicios = ServicioTecnico.objects.select_related("tecnico_obj").filter(
+        tecnico_obj__tipo="interno"
+    ).exclude(
+        tecnico__isnull=True
+    ).exclude(
+        tecnico=""
+    ).exclude(
+        tecnico="Sin técnico"
+    )
+
+    mes = request.GET.get("mes")
+    anio = request.GET.get("anio")
+    tecnico = request.GET.get("tecnico")
+    tipo_servicio = request.GET.get("tipo_servicio")
+
+    if mes:
+        servicios = servicios.filter(carga__mes=mes)
+    if anio:
+        servicios = servicios.filter(carga__anio=anio)
+    if tecnico:
+        servicios = servicios.filter(tecnico=tecnico)
+    if tipo_servicio:
+        servicios = servicios.filter(tipo_servicio__icontains=tipo_servicio)
+
+    tecnicos = servicios.values_list(
+        "tecnico", flat=True
+    ).distinct().order_by("tecnico")
+
+    resumen = {
+        "total": servicios.values("numero").distinct().count(),
+        "costo_total": servicios.aggregate(x=Coalesce(Sum("valor_pago_tecnico"), Value(0)))["x"],
+        "preventivos": servicios.filter(tipo_servicio__icontains="PREVENTIV").values("numero").distinct().count(),
+        "correctivos": servicios.filter(tipo_servicio__icontains="CORRECTIV").values("numero").distinct().count(),
+        "costo_preventivas": servicios.filter(tipo_servicio__icontains="PREVENTIV").aggregate(x=Coalesce(Sum("valor_pago_tecnico"), Value(0)))["x"],
+        "costo_correctivas": servicios.filter(tipo_servicio__icontains="CORRECTIV").aggregate(x=Coalesce(Sum("valor_pago_tecnico"), Value(0)))["x"],
+        "total_b2b": servicios.filter(es_b2b=True).values("numero").distinct().count(),
+        "total_b2c": servicios.filter(es_b2b=False).values("numero").distinct().count(),
+        "costo_b2b": servicios.filter(es_b2b=True).aggregate(x=Coalesce(Sum("valor_pago_tecnico"), Value(0)))["x"],
+        "costo_b2c": servicios.filter(es_b2b=False).aggregate(x=Coalesce(Sum("valor_pago_tecnico"), Value(0)))["x"],
+    }
+
+    tabla_tecnicos = []
+    tecnicos_resumen = servicios.values("tecnico").annotate(
+        total=Count("numero", distinct=True),
+        costo_total=Coalesce(Sum("valor_pago_tecnico"), Value(0)),
+    ).order_by("tecnico")
+
+    for t in tecnicos_resumen:
+        qs_t = servicios.filter(tecnico=t["tecnico"])
+        tabla_tecnicos.append({
+            "tecnico": t["tecnico"],
+            "total": t["total"],
+            "b2b": qs_t.filter(es_b2b=True).values("numero").distinct().count(),
+            "b2c": qs_t.filter(es_b2b=False).values("numero").distinct().count(),
+            "costo_b2b": qs_t.filter(es_b2b=True).aggregate(x=Coalesce(Sum("valor_pago_tecnico"), Value(0)))["x"],
+            "costo_b2c": qs_t.filter(es_b2b=False).aggregate(x=Coalesce(Sum("valor_pago_tecnico"), Value(0)))["x"],
+            "costo_total": t["costo_total"],
+        })
+
+    contexto = {
+        "servicios": servicios.order_by("-fecha_finalizacion")[:500],
+        "resumen": resumen,
+        "tabla_servicios": tabla_tecnicos,
+        "tabla_tecnicos": tabla_tecnicos,
+        "tecnicos": tecnicos,
+        "tecnico_seleccionado": tecnico,
+        "meses_disponibles": CargaMensual.objects.order_by("mes").values_list("mes", flat=True).distinct(),
+        "anios_disponibles": CargaMensual.objects.order_by("anio").values_list("anio", flat=True).distinct(),
+        "mes": mes,
+        "anio": anio,
+        "tipo_servicio": tipo_servicio,
+    }
+    return render(request, "servicios/internos.html", contexto)
+
+
+# =========================================================
+# BUSCADOR
+# =========================================================
+
+def buscador_servicios(request):
+    servicios = ServicioTecnico.objects.select_related("contratista", "tecnico_obj", "ceco")
+
+    mes = request.GET.get("mes")
+    anio = request.GET.get("anio")
+    contratista_id = request.GET.get("contratista_id")
+    tipo_servicio = request.GET.get("tipo_servicio")
+    provincia_estado = request.GET.get("provincia_estado")
+    tecnico_sel = request.GET.get("tecnico")
+    query = request.GET.get("q")
+
+    if mes:
+        servicios = servicios.filter(carga__mes=mes)
+    if anio:
+        servicios = servicios.filter(carga__anio=anio)
+    if contratista_id:
+        servicios = servicios.filter(contratista_id=contratista_id)
+    if tipo_servicio:
+        servicios = servicios.filter(tipo_servicio__icontains=tipo_servicio)
+    if provincia_estado:
+        servicios = servicios.filter(provincia_estado=provincia_estado)
+    if tecnico_sel:
+        servicios = servicios.filter(tecnico=tecnico_sel)
+    if query:
+        servicios = servicios.filter(
+            Q(tecnico__icontains=query) |
+            Q(cuenta_contable__icontains=query) |
+            Q(cuenta__icontains=query) |
+            Q(numero__icontains=query)
+        )
+
+    contratistas = Contratista.objects.filter(activo=True).order_by("nombre")
+    tecnicos = ServicioTecnico.objects.exclude(tecnico__isnull=True).exclude(tecnico="").values_list("tecnico", flat=True).distinct().order_by("tecnico")
+    provincias = ServicioTecnico.objects.exclude(provincia_estado__isnull=True).exclude(provincia_estado="").values_list("provincia_estado", flat=True).distinct().order_by("provincia_estado")
+
+    contexto = {
+        "servicios": servicios.order_by("-fecha_finalizacion")[:500],
+        "contratistas": contratistas,
+        "tecnicos": tecnicos,
+        "provincia": provincias,
+        "meses_disponibles": CargaMensual.objects.order_by("mes").values_list("mes", flat=True).distinct(),
+        "anios_disponibles": CargaMensual.objects.order_by("anio").values_list("anio", flat=True).distinct(),
+        "mes": mes,
+        "anio": anio,
+        "contratista_id": contratista_id,
+        "tipo_servicio": tipo_servicio,
+        "provincia_estado_sel": provincia_estado,
+        "tecnico_sel": tecnico_sel,
+        "query": query,
+    }
+    return render(request, "servicios/buscador.html", contexto)
+
+
+# =========================================================
+# ACTUALIZACIÓN DE MONTO / ESTADO
+# =========================================================
+
+@require_http_methods(["POST"])
+def actualizar_valor_pago(request, servicio_id):
+    servicio = get_object_or_404(ServicioTecnico, id=servicio_id)
+
+    try:
+        if request.content_type == "application/json":
+            data = json.loads(request.body)
+            valor = int(data.get("valor_pago_tecnico", 0))
+        else:
+            valor = int(request.POST.get("valor_pago_tecnico", 0))
+
+        servicio.valor_pago_tecnico = valor
+        servicio.save(update_fields=["valor_pago_tecnico", "fecha_actualizacion"])
+
+        return JsonResponse({
+            "ok": True,
+            "valor_pago_tecnico": valor
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            "ok": False,
+            "error": str(e)
+        }, status=400)
+
+
+@require_http_methods(["POST"])
+def actualizar_estado_pago(request, servicio_id):
+    servicio = get_object_or_404(ServicioTecnico, id=servicio_id)
+
+    nuevo_estado = (request.POST.get("estado_pago") or "").strip().lower()
+
+    estados_validos = {"aprobado", "revision", "rechazado"}
+
+    if nuevo_estado not in estados_validos:
+        return JsonResponse({
+            "ok": False,
+            "error": f"Estado inválido: {nuevo_estado}"
+        }, status=400)
+
+    servicio.estado_pago = nuevo_estado
+    servicio.save(update_fields=["estado_pago", "fecha_actualizacion"])
+
+    return JsonResponse({
+        "ok": True,
+        "estado_pago": servicio.estado_pago
+    })
+
+
+# =========================================================
+# PDF
+# =========================================================
+
+def render_to_pdf(template_src, context_dict):
+    from django.template.loader import get_template
+
+    template = get_template(template_src)
+    html = template.render(context_dict)
+    result = BytesIO()
+    pdf = pisa.pisaDocument(BytesIO(html.encode("utf-8")), result)
+
+    if not pdf.err:
+        return HttpResponse(result.getvalue(), content_type="application/pdf")
+    return None
+
+
+def contratista_pdf(request):
+    servicios = ServicioTecnico.objects.select_related("contratista", "ceco")
+
+    mes = request.GET.get("mes")
+    anio = request.GET.get("anio")
+    contratista_id = request.GET.get("contratista_id")
+    tipo_servicio = request.GET.get("tipo_servicio")
+    provincia_estado = request.GET.get("provincia_estado")
+    estado_pago = request.GET.get("estado_pago")
+    columnas = request.GET.getlist("columnas")
+
+    if mes:
+        servicios = servicios.filter(carga__mes=mes)
+    if anio:
+        servicios = servicios.filter(carga__anio=anio)
+    if contratista_id:
+        servicios = servicios.filter(contratista_id=contratista_id)
+    if tipo_servicio:
+        servicios = servicios.filter(tipo_servicio__icontains=tipo_servicio)
+    if provincia_estado:
+        servicios = servicios.filter(provincia_estado=provincia_estado)
+    if estado_pago:
+        servicios = servicios.filter(estado_pago=estado_pago)
+
+    contratista = Contratista.objects.filter(id=contratista_id).first() if contratista_id else None
+    resumen = obtener_resumen_contratista(servicios)
+
+    meses_map = {
+        "1": "Enero", "2": "Febrero", "3": "Marzo", "4": "Abril",
+        "5": "Mayo", "6": "Junio", "7": "Julio", "8": "Agosto",
+        "9": "Septiembre", "10": "Octubre", "11": "Noviembre", "12": "Diciembre"
+    }
+    cantidad_columnas = len(columnas)
+
+    for s in servicios:
+        s.tecnico_pdf = s.tecnico_obj.nombre if getattr(s, "tecnico_obj", None) else (s.tecnico or "-")
+
+    context = {
+        "servicios": servicios.order_by("-fecha_finalizacion"),
+        "contratista": contratista,
+        "resumen": resumen,
+        "columnas": columnas,
+        "mes_mostrar": meses_map.get(str(mes), "Todos"),
+        "anio_mostrar": anio or "Todos",
+        "estado_pago_mostrar": estado_pago or "Todos",
+        "tipo_servicio_mostrar": tipo_servicio or "Todos",
+        "provincia_estado_mostrar": provincia_estado or "Todas",
+        "cantidad_columnas": cantidad_columnas,
+    }
+
+    pdf = render_to_pdf("servicios/contratista_pdf.html", context)
+    return pdf if pdf else HttpResponse("Error al generar PDF", status=400)
+
+
+# =========================================================
+# PLACEHOLDER EXPORTAR EXCEL
+# =========================================================
 
 def exportar_excel(request):
-    servicios = ServicioTecnico.objects.all().values()
-    df = pd.DataFrame(servicios)
+    return HttpResponse("Pendiente implementar exportación Excel profesional.")
 
-    for col in df.columns:
-        if pd.api.types.is_datetime64_any_dtype(df[col]):
-            try:
-                df[col] = df[col].dt.tz_localize(None)
-            except Exception:
-                try:
-                    df[col] = pd.to_datetime(df[col]).dt.tz_localize(None)
-                except Exception:
-                    pass
 
-    response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+
+# =========================================================
+# RESOLUCIÓN DE OBSERVACIONES
+# =========================================================
+
+def detalle_observacion(request, observacion_id):
+    observacion = get_object_or_404(
+        ObservacionImportacion.objects.select_related(
+            "raw",
+            "raw__archivo_carga",
+            "raw__archivo_carga__carga_mensual",
+        ),
+        id=observacion_id
     )
-    response["Content-Disposition"] = "attachment; filename=servicios.xlsx"
 
-    df.to_excel(response, index=False)
-    return response
+    contratistas = Contratista.objects.filter(activo=True).order_by("nombre")
+    tecnicos = Tecnico.objects.filter(activo=True).order_by("nombre")
+
+    contexto = {
+        "observacion": observacion,
+        "raw": observacion.raw,
+        "contratistas": contratistas,
+        "tecnicos": tecnicos,
+    }
+    return render(request, "servicios/detalle_observacion.html", contexto)
+
+
+@require_POST
+def marcar_observacion_ignorada(request, observacion_id):
+    observacion = get_object_or_404(ObservacionImportacion, id=observacion_id)
+
+    observacion.estado = "ignorada"
+    observacion.resuelto_por = "sistema"  # si después agregas auth, aquí va request.user.username
+    observacion.fecha_resolucion = timezone.now()
+    observacion.comentario_resolucion = request.POST.get("comentario", "Marcada como ignorada")
+    observacion.save(update_fields=[
+        "estado",
+        "resuelto_por",
+        "fecha_resolucion",
+        "comentario_resolucion",
+        "fecha_actualizacion",
+    ])
+
+    messages.warning(request, "Observación marcada como ignorada.")
+    recalcular_estado_carga(observacion.raw.archivo_carga)
+    return redirect("detalle_observacion", observacion_id=observacion.id)
+
+
+@require_POST
+def resolver_observacion_contratista(request, observacion_id):
+    observacion = get_object_or_404(
+        ObservacionImportacion.objects.select_related("raw"),
+        id=observacion_id
+    )
+    raw = observacion.raw
+
+    contratista_id = request.POST.get("contratista_id")
+    crear_alias = request.POST.get("crear_alias") == "on"
+
+    if not contratista_id:
+        messages.error(request, "Debes seleccionar un contratista.")
+        return redirect("detalle_observacion", observacion_id=observacion.id)
+
+    contratista = get_object_or_404(Contratista, id=contratista_id, activo=True)
+
+    nombre_tecnico_original = raw.tecnico_texto or raw.data.get("Tecnico")
+    nombre_limpio = limpiar_nombre_tecnico(nombre_tecnico_original)
+    nombre_normalizado = normalizar_nombre_persona(nombre_limpio)
+
+    tecnico = buscar_tecnico_por_nombre(nombre_limpio)
+
+    if tecnico:
+        tecnico.tipo = "contratista"
+        tecnico.contratista = contratista
+        tecnico.requiere_revision = False
+        tecnico.save(update_fields=["tipo", "contratista", "requiere_revision", "fecha_actualizacion"])
+    else:
+        tecnico = Tecnico.objects.create(
+            nombre=nombre_limpio,
+            tipo="contratista",
+            categoria="remoto",
+            contratista=contratista,
+            activo=True,
+            requiere_revision=False,
+        )
+
+    if crear_alias and nombre_limpio:
+        AliasContratista.objects.get_or_create(
+            alias=nombre_limpio,
+            defaults={
+                "alias_normalizado": nombre_normalizado,
+                "contratista": contratista,
+                "creado_en_revision": True,
+                "activo": True,
+            }
+        )
+
+    # también conviene guardar alias técnico
+    if nombre_limpio:
+        AliasTecnico.objects.get_or_create(
+            alias=nombre_limpio,
+            defaults={
+                "alias_normalizado": nombre_normalizado,
+                "tecnico": tecnico,
+                "activo": True,
+            }
+        )
+
+    observacion.estado = "resuelta"
+    observacion.resuelto_por = "sistema"
+    observacion.fecha_resolucion = timezone.now()
+    observacion.comentario_resolucion = f"Vinculado a contratista: {contratista.nombre}"
+    observacion.save(update_fields=[
+        "estado",
+        "resuelto_por",
+        "fecha_resolucion",
+        "comentario_resolucion",
+        "fecha_actualizacion",
+    ])
+
+    messages.success(request, "Contratista vinculado correctamente. Ahora reprocesa la fila.")
+    recalcular_estado_carga(raw.archivo_carga)
+    return redirect("detalle_observacion", observacion_id=observacion.id)
+
+
+@require_POST
+def resolver_observacion_tecnico(request, observacion_id):
+    observacion = get_object_or_404(
+        ObservacionImportacion.objects.select_related("raw"),
+        id=observacion_id
+    )
+    raw = observacion.raw
+
+    tecnico_id = request.POST.get("tecnico_id")
+    crear_alias = request.POST.get("crear_alias") == "on"
+
+    if not tecnico_id:
+        messages.error(request, "Debes seleccionar un técnico.")
+        return redirect("detalle_observacion", observacion_id=observacion.id)
+
+    tecnico = get_object_or_404(Tecnico, id=tecnico_id, activo=True)
+
+    nombre_tecnico_original = raw.tecnico_texto or raw.data.get("Tecnico")
+    nombre_limpio = limpiar_nombre_tecnico(nombre_tecnico_original)
+    nombre_normalizado = normalizar_nombre_persona(nombre_limpio)
+
+    if crear_alias and nombre_limpio:
+        AliasTecnico.objects.get_or_create(
+            alias=nombre_limpio,
+            defaults={
+                "alias_normalizado": nombre_normalizado,
+                "tecnico": tecnico,
+                "activo": True,
+            }
+        )
+
+    observacion.estado = "resuelta"
+    observacion.resuelto_por = "sistema"
+    observacion.fecha_resolucion = timezone.now()
+    observacion.comentario_resolucion = f"Vinculado a técnico: {tecnico.nombre}"
+    observacion.save(update_fields=[
+        "estado",
+        "resuelto_por",
+        "fecha_resolucion",
+        "comentario_resolucion",
+        "fecha_actualizacion",
+    ])
+
+    messages.success(request, "Técnico vinculado correctamente. Ahora reprocesa la fila.")
+    recalcular_estado_carga(raw.archivo_carga)
+    return redirect("detalle_observacion", observacion_id=observacion.id)
+
+
+@require_POST
+def reprocesar_raw(request, raw_id):
+
+    raw = get_object_or_404(
+        ServicioTecnicoRaw.objects.select_related("archivo_carga", "archivo_carga__carga_mensual"),
+        id=raw_id
+    )
+
+    # borrar publicación anterior si existía
+    ServicioTecnico.objects.filter(raw=raw).delete()
+
+    # limpiar observaciones pendientes o errores anteriores
+    raw.estado = "pendiente"
+    raw.procesado = False
+    raw.publicado = False
+    raw.requiere_revision = False
+    raw.error = None
+    raw.save(update_fields=[
+        "estado",
+        "procesado",
+        "publicado",
+        "requiere_revision",
+        "error",
+        "fecha_actualizacion",
+    ])
+
+    cuentas_b2b_dict = obtener_dict_cuentas_b2b()
+    servicio = procesar_raw_a_servicio(raw, cuentas_b2b_dict)
+
+    # recalcular incidencias del archivo
+    recalcular_incidencias_para_archivo(raw.archivo_carga)
+
+    # actualizar métricas del archivo
+    archivo = raw.archivo_carga
+    archivo.filas_procesadas = ServicioTecnicoRaw.objects.filter(
+        archivo_carga=archivo,
+        procesado=True
+    ).count()
+
+    archivo.filas_publicadas = ServicioTecnicoRaw.objects.filter(
+        archivo_carga=archivo,
+        publicado=True
+    ).count()
+
+    tipos_revision_real = ["contratista_no_encontrado", "tecnico_sin_match"]
+
+    archivo.filas_con_observacion = ObservacionImportacion.objects.filter(
+        raw__archivo_carga=archivo,
+        tipo__in=tipos_revision_real,
+        estado="pendiente"
+    ).count()
+
+    archivo.estado = "procesado_con_observaciones" if archivo.filas_con_observacion > 0 else "procesado"
+    archivo.mensaje = (
+        f"Procesadas: {archivo.filas_procesadas} | "
+        f"Publicadas: {archivo.filas_publicadas} | "
+        f"Observaciones reales: {archivo.filas_con_observacion}"
+    )
+    archivo.save(update_fields=[
+        "filas_procesadas",
+        "filas_publicadas",
+        "filas_con_observacion",
+        "estado",
+        "mensaje",
+        "fecha_actualizacion",
+    ])
+
+    if servicio and not servicio.requiere_revision:
+        messages.success(request, "Fila reprocesada y publicada correctamente.")
+    else:
+        messages.warning(request, "Fila reprocesada, pero sigue con observaciones.")
+
+    # redirige al detalle de la primera observación pendiente si existe
+    obs = raw.observaciones.order_by("-fecha_creacion").first()
+    if obs:
+        return redirect("detalle_observacion", observacion_id=obs.id)
+    recalcular_estado_carga(archivo)
+    return redirect("observaciones_importacion")
+
+
+
+
+
+@require_POST
+def crear_contratista_desde_observacion(request, observacion_id):
+    observacion = get_object_or_404(
+        ObservacionImportacion.objects.select_related("raw"),
+        id=observacion_id
+    )
+    raw = observacion.raw
+
+    nombre_detectado = limpiar_nombre_tecnico(raw.tecnico_texto or raw.data.get("Tecnico"))
+    if not nombre_detectado:
+        messages.error(request, "No se detectó un nombre válido para crear el contratista.")
+        return redirect("detalle_observacion", observacion_id=observacion.id)
+
+    nombre_empresa = request.POST.get("nombre_empresa") or nombre_detectado
+    rut = request.POST.get("rut")
+    correo = request.POST.get("correo")
+    ciudad = request.POST.get("ciudad")
+    fono = request.POST.get("fono")
+    banco = request.POST.get("banco")
+    tipo_cuenta = request.POST.get("tipo_cuenta")
+    numero_cuenta = request.POST.get("numero_cuenta")
+    categoria = request.POST.get("categoria") or "Factura"
+
+    contratista = Contratista.objects.create(
+        nombre=nombre_detectado,
+        nombre_empresa=nombre_empresa,
+        rut=rut or None,
+        correo=correo or None,
+        ciudad=ciudad or None,
+        fono=fono or None,
+        banco=banco or None,
+        tipo_cuenta=tipo_cuenta or None,
+        numero_cuenta=numero_cuenta or None,
+        categoria=categoria,
+        origen="revision",
+        activo=True,
+        requiere_revision=False,
+    )
+
+    tecnico = buscar_tecnico_por_nombre(nombre_detectado)
+
+    if tecnico:
+        tecnico.tipo = "contratista"
+        tecnico.contratista = contratista
+        tecnico.requiere_revision = False
+        tecnico.save(update_fields=["tipo", "contratista", "requiere_revision", "fecha_actualizacion"])
+    else:
+        tecnico = Tecnico.objects.create(
+            nombre=nombre_detectado,
+            tipo="contratista",
+            categoria="remoto",
+            contratista=contratista,
+            activo=True,
+            requiere_revision=False,
+        )
+
+    AliasContratista.objects.get_or_create(
+        alias=nombre_detectado,
+        defaults={
+            "alias_normalizado": normalizar_nombre_persona(nombre_detectado),
+            "contratista": contratista,
+            "creado_en_revision": True,
+            "activo": True,
+        }
+    )
+
+    AliasTecnico.objects.get_or_create(
+        alias=nombre_detectado,
+        defaults={
+            "alias_normalizado": normalizar_nombre_persona(nombre_detectado),
+            "tecnico": tecnico,
+            "activo": True,
+        }
+    )
+
+    observacion.estado = "resuelta"
+    observacion.resuelto_por = "sistema"
+    observacion.fecha_resolucion = timezone.now()
+    observacion.comentario_resolucion = f"Se creó contratista nuevo: {contratista.nombre}"
+    observacion.save(update_fields=[
+        "estado",
+        "resuelto_por",
+        "fecha_resolucion",
+        "comentario_resolucion",
+        "fecha_actualizacion",
+    ])
+
+    messages.success(request, "Contratista creado correctamente. Ahora reprocesa la fila.")
+    recalcular_estado_carga(observacion.raw.archivo_carga)
+    return redirect("detalle_observacion", observacion_id=observacion.id)

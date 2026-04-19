@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Cargas Procesadas{% endblock %}
+
+{% block content %}
+
+<h2 class="text-center mb-4">Cargas Procesadas</h2>
+
+<div class="table-responsive">
+    <table class="table table-bordered table-hover align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>Fecha</th>
+                <th>Nombre archivo</th>
+                <th>Carga mensual</th>
+                <th>Estado</th>
+                <th>Total filas</th>
+                <th>Procesadas</th>
+                <th>Publicadas</th>
+                <th>Con observación</th>
+                <th>Observaciones</th>
+                <th>Mensaje</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in archivos %}
+            <tr>
+                <td>{{ a.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                <td>{{ a.nombre_original }}</td>
+                <td>
+                    {% if a.carga_mensual %}
+                        {{ a.carga_mensual.nombre }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if a.estado == "procesado" %}
+                        <span class="badge bg-success">Procesado</span>
+                    {% elif a.estado == "procesado_con_observaciones" %}
+                        <span class="badge bg-warning text-dark">Con observaciones</span>
+                    {% elif a.estado == "procesando" %}
+                        <span class="badge bg-primary">Procesando</span>
+                    {% elif a.estado == "error" %}
+                        <span class="badge bg-danger">Error</span>
+                    {% else %}
+                        <span class="badge bg-secondary">{{ a.estado }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ a.total_filas|default:0|intcomma }}</td>
+                <td>{{ a.filas_procesadas|default:0|intcomma }}</td>
+                <td>{{ a.filas_publicadas|default:0|intcomma }}</td>
+                <td>{{ a.filas_con_observacion|default:0|intcomma }}</td>
+
+                <td class="text-center">
+                    {% if a.filas_con_observacion|default:0 > 0 %}
+                        <a href="{% url 'observaciones_importacion' %}?archivo_id={{ a.id }}" class="btn btn-sm btn-warning">
+                            Revisar
+                        </a>
+                    {% else %}
+                        <span class="text-muted">Sin observaciones</span>
+                    {% endif %}
+                </td>
+
+                <td>{{ a.mensaje|default:"-" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="10" class="text-center">No hay cargas registradas.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

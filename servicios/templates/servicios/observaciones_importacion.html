@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Observaciones de Importación{% endblock %}
+
+{% block content %}
+
+<h2 class="text-center mb-4">Observaciones de Importación</h2>
+
+<form method="get" class="row mb-4 align-items-end g-2">
+
+    <div class="col-md-3">
+        <label class="form-label">Estado</label>
+        <select name="estado" class="form-select">
+            <option value="">Todos los estados</option>
+            <option value="pendiente" {% if estado_sel == "pendiente" %}selected{% endif %}>Pendiente</option>
+            <option value="resuelta" {% if estado_sel == "resuelta" %}selected{% endif %}>Resuelta</option>
+            <option value="ignorada" {% if estado_sel == "ignorada" %}selected{% endif %}>Ignorada</option>
+        </select>
+    </div>
+
+    <div class="col-md-5">
+        <label class="form-label">Detalle</label>
+        <select name="detalle" class="form-select">
+            <option value="">Todos los detalles</option>
+            {% for d in detalles_disponibles %}
+                <option value="{{ d }}" {% if detalle_sel == d %}selected{% endif %}>
+                    {{ d }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    {% if archivo_id %}
+        <input type="hidden" name="archivo_id" value="{{ archivo_id }}">
+    {% endif %}
+
+    <div class="col-md-2 d-grid">
+        <button type="submit" class="btn btn-primary">
+            Filtrar
+        </button>
+    </div>
+
+    <div class="col-md-2 d-grid">
+        <a href="{% url 'observaciones_importacion' %}" class="btn btn-outline-secondary">
+            Limpiar
+        </a>
+    </div>
+
+</form>
+
+<div class="table-responsive">
+    <table class="table table-bordered table-hover align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>Fecha</th>
+                <th>Estado</th>
+                <th>Tipo</th>
+                <th>Archivo</th>
+                <th>Fila</th>
+                <th>Detalle</th>
+                <th>Valor detectado</th>
+                <th>Sugerencia</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for o in observaciones %}
+            <tr>
+                <td>{{ o.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                <td>
+                    {% if o.estado == "pendiente" %}
+                        <span class="badge bg-danger">Pendiente</span>
+                    {% elif o.estado == "resuelta" %}
+                        <span class="badge bg-success">Resuelta</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Ignorada</span>
+                    {% endif %}
+                </td>
+                <td>{{ o.get_tipo_display }}</td>
+                <td>
+                    {% if o.raw and o.raw.archivo_carga %}
+                        {{ o.raw.archivo_carga.nombre_original }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if o.raw %}
+                        {{ o.raw.fila_numero }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ o.detalle }}</td>
+                <td>{{ o.valor_detectado|default:"-" }}</td>
+                <td>{{ o.sugerencia|default:"-" }}</td>
+                <td>
+                    <a href="{% url 'detalle_observacion' o.id %}" class="btn btn-sm btn-primary">
+                        Revisar
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="9" class="text-center">No hay observaciones registradas.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

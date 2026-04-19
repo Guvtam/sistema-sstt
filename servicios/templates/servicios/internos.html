@@ -72,76 +72,78 @@
 </form>
 
 <!-- DASHBOARD -->
-<div class="row mb-3">
+<!-- DASHBOARD -->
+<div class="row mb-4 align-items-stretch">
 
-    <!-- KPI TOTAL -->
-    <div class="col-md-2">
-        <div class="kpi-card text-center">
-            <div class="kpi-title">Total Mantenciones</div>
-            <div class="kpi-value">{{ resumen.total }}</div>
-            <div class="small text-muted mt-2">Monto total</div>
-            <div class="kpi-value">
-                $ {{ resumen.costo_total|default:0|floatformat:0|intcomma }}
-            </div>
-        </div>
-    </div>
-
-    <!-- KPI PREVENTIVAS -->
-    <div class="col-md-2">
-        <div class="kpi-card text-center border-success">
-            <div class="kpi-title text-success">Preventivas</div>
-            <div class="kpi-value">{{ resumen.preventivos }}</div>
-            <div class="small text-muted mt-2">Monto</div>
-            <div class="kpi-value">
-                $ {{ resumen.costo_preventivas|default:0|floatformat:0|intcomma }}
-            </div>
-        </div>
-    </div>
-
-    <!-- KPI CORRECTIVAS -->
-    <div class="col-md-2">
-        <div class="kpi-card text-center border-warning">
-            <div class="kpi-title text-warning">Correctivas</div>
-            <div class="kpi-value">{{ resumen.correctivos }}</div>
-            <div class="small text-muted mt-2">Monto</div>
-            <div class="kpi-value">
-                $ {{ resumen.costo_correctivas|default:0|floatformat:0|intcomma }}
-            </div>
-        </div>
-    </div>
-
-    <!-- KPI B2B -->
-    <div class="col-md-3">
-        <div class="kpi-card text-center border-primary">
-            <div class="kpi-title text-primary">B2B</div>
-            <div class="kpi-value">{{ resumen.total_b2b|default:0 }}</div>
-            <div class="small text-muted mt-2">Monto</div>
-            <div class="kpi-value">
-                $ {{ resumen.costo_b2b|default:0|floatformat:0|intcomma }}
-            </div>
-        </div>
-    </div>
-
-    <!-- KPI B2C -->
-    <div class="col-md-3">
-        <div class="kpi-card text-center border-secondary">
-            <div class="kpi-title text-secondary">B2C</div>
-            <div class="kpi-value">{{ resumen.total_b2c|default:0 }}</div>
-            <div class="small text-muted mt-2">Monto</div>
-            <div class="kpi-value">
-                $ {{ resumen.costo_b2c|default:0|floatformat:0|intcomma }}
-            </div>
-        </div>
-    </div>
-
-</div>
-
-<!-- TABLAS RESUMEN -->
-<div class="row mb-3">
-
-    <!-- TABLA RESUMEN POR TECNICO -->
+    <!-- IZQUIERDA: TARJETAS -->
     <div class="col-md-6">
-        <div class="card h-100">
+        <div class="row g-3">
+
+            <!-- TARJETA GRANDE TOTAL -->
+            <div class="col-md-12">
+                <div class="kpi-card text-center h-100">
+                    <div class="kpi-title">Total Mantenciones</div>
+                    <div class="kpi-value">{{ resumen.total }}</div>
+
+                    <div class="small text-muted mt-2">Monto total</div>
+                    <div class="kpi-value">
+                        $ {{ resumen.costo_total|default:0|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- FILA 2 -->
+            <div class="col-md-6">
+                <div class="kpi-card text-center border-success h-100">
+                    <div class="kpi-title text-success">Preventivas</div>
+                    <div class="kpi-value">{{ resumen.preventivos }}</div>
+                    <div class="small text-muted mt-2">Monto</div>
+                    <div class="kpi-value">
+                        $ {{ resumen.costo_preventivas|default:0|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="kpi-card text-center border-warning h-100">
+                    <div class="kpi-title text-warning">Correctivas</div>
+                    <div class="kpi-value">{{ resumen.correctivos }}</div>
+                    <div class="small text-muted mt-2">Monto</div>
+                    <div class="kpi-value">
+                        $ {{ resumen.costo_correctivas|default:0|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- FILA 3 -->
+            <div class="col-md-6">
+                <div class="kpi-card text-center border-primary h-100">
+                    <div class="kpi-title text-primary">B2B</div>
+                    <div class="kpi-value">{{ resumen.total_b2b|default:0 }}</div>
+                    <div class="small text-muted mt-2">Monto</div>
+                    <div class="kpi-value">
+                        $ {{ resumen.costo_b2b|default:0|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="kpi-card text-center border-secondary h-100">
+                    <div class="kpi-title text-secondary">B2C</div>
+                    <div class="kpi-value">{{ resumen.total_b2c|default:0 }}</div>
+                    <div class="small text-muted mt-2">Monto</div>
+                    <div class="kpi-value">
+                        $ {{ resumen.costo_b2c|default:0|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- DERECHA: ÚNICA TABLA RESUMEN -->
+    <div class="col-md-6 d-flex">
+        <div class="card h-100 w-100">
             <div class="card-header text-center">Resumen por Técnico</div>
 
             <div class="table-responsive">
@@ -179,56 +181,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center">No hay datos.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- TABLA TECNICOS -->
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header text-center">Técnicos</div>
-
-            <div class="table-responsive">
-                <table class="table table-sm table-bordered mb-0">
-                    <thead class="table-light">
-                        <tr style="font-size:11px">
-                            <th>Técnico</th>
-                            <th>Total</th>
-                            <th>B2B</th>
-                            <th>B2C</th>
-                            <th>Monto B2B</th>
-                            <th>Monto B2C</th>
-                            <th>Total $</th>
-                        </tr>
-                    </thead>
-                    <tbody style="font-size:11px">
-                        {% for t in tabla_tecnicos %}
-                        <tr>
-                            <td>{{ t.tecnico }}</td>
-                            <td>{{ t.total }}</td>
-                            <td>{{ t.b2b }}</td>
-                            <td>{{ t.b2c }}</td>
-
-                            <td class="text-end">
-                                $ {{ t.costo_b2b|floatformat:0|intcomma }}
-                            </td>
-
-                            <td class="text-end">
-                                $ {{ t.costo_b2c|floatformat:0|intcomma }}
-                            </td>
-
-                            <td class="text-end fw-bold">
-                                $ {{ t.costo_total|floatformat:0|intcomma }}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="text-center">No hay datos.</td>
+                            <td colspan="7" class="text-center">No hay datos.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
