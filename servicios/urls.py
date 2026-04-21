@@ -32,5 +32,9 @@ urlpatterns = [
     path("servicio/<int:servicio_id>/editar-monto-tecnico/",views.actualizar_valor_pago,name="editar_monto_tecnico"),
 
     path("observacion/<int:observacion_id>/crear-contratista/",views.crear_contratista_desde_observacion,name="crear_contratista_desde_observacion"),
+    path("servicios/<int:servicio_id>/actualizar-informe-tecnico/",views.actualizar_informe_tecnico,name="actualizar_informe_tecnico"),
+
+
+
     
 ]

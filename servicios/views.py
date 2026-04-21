@@ -64,6 +64,17 @@ COLUMNAS_ESPERADAS = [
     "Tiempo de Trabajo Total",
 ]
 
+PATRONES_CUENTA = [
+    r"FIR\s*-?\s*[A-Z0-9]+",
+    r"NEW\s*-?\s*SF[_-]?\s*[A-Z0-9]+",
+    r"GDS\s*-\s*[A-Z0-9]+",
+]
+
+CONTRATISTAS_FORZADOS = [
+    "NEXTTECH",
+    "MARCO ANTONIO NAVARRO",
+]
+
 
 def recalcular_estado_carga(archivo):
     """
@@ -157,6 +168,9 @@ def detectar_tipo_tecnico(texto_original):
 
     texto = str(texto_original).upper()
 
+    if any(x in texto for x in CONTRATISTAS_FORZADOS):
+        return "contratista"
+
     if "T. EXTERNO" in texto or "T EXTERNO" in texto:
         return "contratista"
 
@@ -211,25 +225,55 @@ def normalizar_cuenta(valor):
 
     return valor
 
+@require_http_methods(["POST"])
+def actualizar_informe_tecnico(request, servicio_id):
+    servicio = get_object_or_404(ServicioTecnico, id=servicio_id)
+
+    valor = (request.POST.get("informe_tecnico") or "").strip().lower()
+    valores_validos = {"si", "no", "no_aplica"}
+
+    if valor not in valores_validos:
+        return JsonResponse({
+            "ok": False,
+            "error": f"Valor inválido: {valor}"
+        }, status=400)
+
+    servicio.informe_tecnico = valor
+
+    # Reglas automáticas del flujo
+    if valor == "no":
+        servicio.estado_pago = "rechazado"
+    elif valor == "no_aplica":
+        servicio.estado_pago = "revision"
+    # si == "si", mantiene el estado actual
+
+    servicio.save(update_fields=[
+        "informe_tecnico",
+        "estado_pago",
+        "fecha_actualizacion"
+    ])
+
+    return JsonResponse({
+        "ok": True,
+        "informe_tecnico": servicio.informe_tecnico,
+        "estado_pago": servicio.estado_pago,
+    })
 
 def extraer_cuenta_contable(valor):
     if valor is None:
-        return ""
+        return None
 
     texto = str(valor).strip().upper()
 
     if texto in ["", "NAN", "NONE", "NULL"]:
-        return ""
+        return None
 
-    match = re.search(r"FIR\s*-?\s*[A-Z0-9]+", texto)
-    if match:
-        return normalizar_cuenta(match.group(0))
+    for patron in PATRONES_CUENTA:
+        match = re.search(patron, texto)
+        if match:
+            return normalizar_cuenta(match.group(0))
 
-    match = re.search(r"NEW\s*-?\s*SF[_-]?\s*[A-Z0-9]+", texto)
-    if match:
-        return normalizar_cuenta(match.group(0))
-
-    return ""
+    return None
 
 
 def convertir_fecha(valor):
@@ -427,21 +471,71 @@ def resolver_tecnico_y_contratista(nombre_tecnico_original, raw):
     if not nombre_tecnico_original or str(nombre_tecnico_original).strip() == "":
         return None, None, "sin_tecnico"
 
-    tipo_detectado = detectar_tipo_tecnico(nombre_tecnico_original)
+    texto_original = str(nombre_tecnico_original).upper()
     nombre_limpio = limpiar_nombre_tecnico(nombre_tecnico_original)
     nombre_normalizado = normalizar_nombre_persona(nombre_limpio)
+
+    tipo_detectado = detectar_tipo_tecnico(nombre_tecnico_original)
+
+    # Forzar ciertos nombres como contratista
+    es_contratista_forzado = any(x in texto_original for x in CONTRATISTAS_FORZADOS)
+    if es_contratista_forzado:
+        tipo_detectado = "contratista"
 
     tecnico = buscar_tecnico_por_nombre(nombre_limpio)
     contratista = None
 
+    # Si ya existe el técnico
     if tecnico:
+        if es_contratista_forzado:
+            contratista = tecnico.contratista
+
+            # Si no tiene contratista asignado, intentar buscarlo
+            if not contratista:
+                if "NEXTTECH" in texto_original or "NEXT TECH" in texto_original:
+                    contratista = Contratista.objects.filter(
+                        nombre__icontains="NEXTTECH",
+                        activo=True
+                    ).first()
+                elif "MARCO ANTONIO NAVARRO" in texto_original:
+                    contratista = Contratista.objects.filter(
+                        nombre__icontains="MARCO ANTONIO NAVARRO",
+                        activo=True
+                    ).first()
+
+            tecnico.tipo = "contratista"
+            tecnico.contratista = contratista
+            tecnico.requiere_revision = False
+            tecnico.save(update_fields=[
+                "tipo",
+                "contratista",
+                "requiere_revision",
+                "fecha_actualizacion"
+            ])
+
+            return tecnico, contratista, tipo_detectado
+
         if tecnico.tipo == "contratista":
             contratista = tecnico.contratista
+
         return tecnico, contratista, tipo_detectado
 
-    # si no existe técnico, intentar resolver contratista por nombre
+    # Si no existe técnico, intentar resolver contratista por nombre
     if tipo_detectado == "contratista":
         contratista = buscar_contratista_por_nombre(nombre_limpio)
+
+        # Reglas especiales para contratistas forzados
+        if not contratista and es_contratista_forzado:
+            if "NEXTTECH" in texto_original or "NEXT TECH" in texto_original:
+                contratista = Contratista.objects.filter(
+                    nombre__icontains="NEXTTECH",
+                    activo=True
+                ).first()
+            elif "MARCO ANTONIO NAVARRO" in texto_original:
+                contratista = Contratista.objects.filter(
+                    nombre__icontains="MARCO ANTONIO NAVARRO",
+                    activo=True
+                ).first()
 
         if contratista:
             tecnico = Tecnico.objects.create(
@@ -464,7 +558,7 @@ def resolver_tecnico_y_contratista(nombre_tecnico_original, raw):
 
             return tecnico, contratista, tipo_detectado
 
-        # esto sí queda en revisión
+        # Queda en revisión si no se encontró contratista
         tecnico = Tecnico.objects.create(
             nombre=nombre_limpio,
             tipo="contratista",
@@ -472,6 +566,15 @@ def resolver_tecnico_y_contratista(nombre_tecnico_original, raw):
             contratista=None,
             activo=True,
             requiere_revision=True,
+        )
+
+        AliasTecnico.objects.get_or_create(
+            alias=nombre_limpio,
+            defaults={
+                "alias_normalizado": nombre_normalizado,
+                "tecnico": tecnico,
+                "activo": True,
+            }
         )
 
         crear_observacion(
@@ -484,10 +587,10 @@ def resolver_tecnico_y_contratista(nombre_tecnico_original, raw):
 
         return tecnico, None, tipo_detectado
 
-    # interno o no detectado: crear técnico normal
+    # Interno o no detectado
     tecnico = Tecnico.objects.create(
         nombre=nombre_limpio,
-        tipo="interno" if tipo_detectado != "contratista" else "contratista",
+        tipo="interno",
         categoria="remoto",
         activo=True,
         requiere_revision=False,
@@ -1136,7 +1239,8 @@ def contratista(request):
     ).exclude(
         tecnico="Sin técnico"
     ).filter(
-        tecnico_obj__tipo="contratista"
+        Q(tecnico_obj__tipo="contratista") |
+        Q(contratista__isnull=False)
     )
 
     mes = request.GET.get("mes")
@@ -1151,7 +1255,10 @@ def contratista(request):
     if anio:
         servicios = servicios.filter(carga__anio=anio)
     if contratista_id:
-        servicios = servicios.filter(contratista_id=contratista_id)
+        servicios = servicios.filter(
+            Q(contratista_id=contratista_id) |
+            Q(tecnico_obj__contratista_id=contratista_id)
+        )
     if tipo_servicio:
         servicios = servicios.filter(tipo_servicio__icontains=tipo_servicio)
     if provincia_estado:
@@ -1560,7 +1667,6 @@ def resolver_observacion_contratista(request, observacion_id):
             }
         )
 
-    # también conviene guardar alias técnico
     if nombre_limpio:
         AliasTecnico.objects.get_or_create(
             alias=nombre_limpio,
@@ -1570,6 +1676,30 @@ def resolver_observacion_contratista(request, observacion_id):
                 "activo": True,
             }
         )
+
+    # NUEVO: actualizar el servicio final ya creado para esta fila
+    servicio = ServicioTecnico.objects.filter(raw=raw).first()
+    if servicio:
+        servicio.tecnico_obj = tecnico
+        servicio.contratista = contratista
+        servicio.requiere_revision = False
+        servicio.save(update_fields=[
+            "tecnico_obj",
+            "contratista",
+            "requiere_revision",
+            "fecha_actualizacion",
+        ])
+
+    # opcional: marcar raw como publicado si ya quedó resuelto
+    raw.requiere_revision = False
+    raw.publicado = True
+    raw.estado = "publicado"
+    raw.save(update_fields=[
+        "requiere_revision",
+        "publicado",
+        "estado",
+        "fecha_actualizacion",
+    ])
 
     observacion.estado = "resuelta"
     observacion.resuelto_por = "sistema"
@@ -1583,7 +1713,7 @@ def resolver_observacion_contratista(request, observacion_id):
         "fecha_actualizacion",
     ])
 
-    messages.success(request, "Contratista vinculado correctamente. Ahora reprocesa la fila.")
+    messages.success(request, "Contratista vinculado correctamente.")
     recalcular_estado_carga(raw.archivo_carga)
     return redirect("detalle_observacion", observacion_id=observacion.id)
 

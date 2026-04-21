@@ -162,6 +162,19 @@
     </div>
 
     <div class="col-md-2">
+        
+        <select name="informe_tecnico" class="form-select">
+            <option value="">Informe Técnico</option>
+            <option value="si" {% if informe_tecnico == "si" %}selected{% endif %}>Sí</option>
+            <option value="no" {% if informe_tecnico == "no" %}selected{% endif %}>No</option>
+            <option value="no_aplica" {% if informe_tecnico == "no_aplica" %}selected{% endif %}>No aplica</option>
+            <option value="pendiente" {% if informe_tecnico == "pendiente" %}selected{% endif %}>Pendiente</option>
+        </select>
+    </div>
+
+    
+
+    <div class="col-md-2">
         <select name="estado_pago" class="form-select" onchange="this.form.submit()">
             <option value="">Seleccione estado de pago</option>
             <option value="aprobado" {% if estado_pago == "aprobado" %}selected{% endif %}>Aprobados</option>
@@ -324,6 +337,7 @@
 <th>Monto</th>
 <th>Incidencias Día</th>
 <th>Incidencias 60 Días</th>
+<th>Informe Técnico</th>
 <th>Estado pago</th>
 </tr>
 </thead>
@@ -420,6 +434,15 @@
         {% else %}
             <span class="badge bg-success">{{ s.numero_incidencias_60_dias }}</span>
         {% endif %}
+    </td>
+    <td>
+        <select class="form-select form-select-sm informe-tecnico-select"
+                data-id="{{ s.id }}">
+            <option value="" {% if not s.informe_tecnico %}selected{% endif %}>---</option>
+            <option value="si" {% if s.informe_tecnico == "si" %}selected{% endif %}>Sí</option>
+            <option value="no" {% if s.informe_tecnico == "no" %}selected{% endif %}>No</option>
+            <option value="no_aplica" {% if s.informe_tecnico == "no_aplica" %}selected{% endif %}>No aplica</option>
+        </select>
     </td>
 
     <td>
@@ -583,6 +606,32 @@ document.addEventListener("DOMContentLoaded", function () {
             document.getElementById("pdf_tipo_servicio").value = valorSeguro('select[name="tipo_servicio"]');
             document.getElementById("pdf_provincia_estado").value = valorSeguro('select[name="provincia_estado"]');
         });
+    }
+});
+
+document.addEventListener("change", async function(e) {
+    if (!e.target.classList.contains("informe-tecnico-select")) return;
+
+    const servicioId = e.target.dataset.id;
+    const valor = e.target.value;
+
+    const formData = new FormData();
+    formData.append("informe_tecnico", valor);
+
+    const response = await fetch(`/servicios/${servicioId}/actualizar-informe-tecnico/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": "{{ csrf_token }}"
+        },
+        body: formData
+    });
+
+    const data = await response.json();
+
+    if (!data.ok) {
+        alert(data.error || "Error al actualizar informe técnico");
+    } else {
+        location.reload();
     }
 });
 </script>

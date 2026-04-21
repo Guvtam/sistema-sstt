@@ -482,6 +482,12 @@ class ServicioTecnico(TimeStampedModel):
         ("no_cobrado", "No Cobrado"),
     ]
 
+    INFORME_TECNICO_CHOICES = [
+        ("si", "Sí"),
+        ("no", "No"),
+        ("no_aplica", "No aplica"),
+    ]
+
     carga = models.ForeignKey(
         CargaMensual,
         on_delete=models.CASCADE,
@@ -529,6 +535,14 @@ class ServicioTecnico(TimeStampedModel):
         null=True,
         blank=True,
         related_name="servicios"
+    )
+
+    informe_tecnico = models.CharField(
+        max_length=20,
+        choices=INFORME_TECNICO_CHOICES,
+        null=True,
+        blank=True,
+        default=None
     )
 
     direccion = models.CharField(max_length=300, null=True, blank=True)

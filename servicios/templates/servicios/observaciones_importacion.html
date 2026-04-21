@@ -55,6 +55,7 @@
                 <th>Fecha</th>
                 <th>Estado</th>
                 <th>Tipo</th>
+                <th>Carga Mensual</th>
                 <th>Archivo</th>
                 <th>Fila</th>
                 <th>Detalle</th>
@@ -77,6 +78,18 @@
                     {% endif %}
                 </td>
                 <td>{{ o.get_tipo_display }}</td>
+
+                <td>
+                    {% if o.raw and o.raw.archivo_carga and o.raw.archivo_carga.carga_mensual %}
+                        {{ o.raw.archivo_carga.carga_mensual.nombre }}
+                        {% if o.raw.archivo_carga.carga_mensual.mes and o.raw.archivo_carga.carga_mensual.anio %}
+                            ({{ o.raw.archivo_carga.carga_mensual.mes }}/{{ o.raw.archivo_carga.carga_mensual.anio }})
+                        {% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+
                 <td>
                     {% if o.raw and o.raw.archivo_carga %}
                         {{ o.raw.archivo_carga.nombre_original }}
